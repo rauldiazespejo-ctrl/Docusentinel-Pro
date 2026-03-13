@@ -1,0 +1,23 @@
+{
+  "name": "docusentinel-netlify-functions",
+  "version": "1.0.0",
+  "description": "Funciones de Netlify para DocuSentinel Pro",
+  "main": "api.js",
+  "dependencies": {
+    "hono": "^4.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "bcryptjs": "^2.4.3",
+    "speakeasy": "^2.0.0",
+    "qrcode": "^1.5.0",
+    "node-forge": "^1.3.0",
+    "crypto-js": "^4.1.0",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "test": "echo 'No tests specified'"
+  }
+}
