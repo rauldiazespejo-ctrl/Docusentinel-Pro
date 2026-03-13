@@ -1,0 +1,174 @@
+
+--- 2026-03-11T14:21:27.985Z debug
+🪵  Writing logs to "/home/user/.config/.wrangler/logs/wrangler-2026-03-11_14-21-27_619.log"
+---
+
+--- 2026-03-11T14:21:27.985Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command started","timestamp":1773238887985,"properties":{"amplitude_session_id":1773238887983,"amplitude_event_id":0,"wranglerVersion":"4.52.1","osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"none","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"argsUsed":[],"argsCombination":"","command":"wrangler whoami","args":{}}}
+---
+
+--- 2026-03-11T14:21:27.996Z debug
+.env file not found at "/home/user/.env". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T14:21:27.996Z debug
+.env file not found at "/home/user/.env.local". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T14:21:28.092Z debug
+Metrics dispatcher: Failed to send request: Too Many Requests
+---
+
+--- 2026-03-11T14:21:28.768Z log
+
+ ⛅️ wrangler 4.52.1 (update available 4.72.0)
+─────────────────────────────────────────────
+---
+
+--- 2026-03-11T14:21:28.817Z log
+Getting User settings...
+---
+
+--- 2026-03-11T14:21:28.820Z debug
+-- START CF API REQUEST: GET https://api.cloudflare.com/client/v4/user/tokens/verify
+---
+
+--- 2026-03-11T14:21:28.820Z debug
+QUERY STRING: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:28.821Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:28.822Z debug
+INIT: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:28.822Z debug
+-- END CF API REQUEST
+---
+
+--- 2026-03-11T14:21:29.652Z debug
+-- START CF API RESPONSE: Unauthorized 401
+---
+
+--- 2026-03-11T14:21:29.654Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:29.654Z debug
+RESPONSE: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:29.654Z debug
+-- END CF API RESPONSE
+---
+
+--- 2026-03-11T14:21:29.660Z debug
+-- START CF API REQUEST: GET https://api.cloudflare.com/client/v4/user
+---
+
+--- 2026-03-11T14:21:29.660Z debug
+QUERY STRING: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:29.660Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:29.660Z debug
+INIT: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:29.660Z debug
+-- END CF API REQUEST
+---
+
+--- 2026-03-11T14:21:30.607Z debug
+-- START CF API RESPONSE: Forbidden 403
+---
+
+--- 2026-03-11T14:21:30.608Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:30.608Z debug
+RESPONSE: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:30.608Z debug
+-- END CF API RESPONSE
+---
+
+--- 2026-03-11T14:21:30.611Z debug
+-- START CF API REQUEST: GET https://api.cloudflare.com/client/v4/accounts
+---
+
+--- 2026-03-11T14:21:30.611Z debug
+QUERY STRING: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:30.611Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:30.611Z debug
+INIT: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:30.611Z debug
+-- END CF API REQUEST
+---
+
+--- 2026-03-11T14:21:31.448Z debug
+-- START CF API RESPONSE: OK 200
+---
+
+--- 2026-03-11T14:21:31.449Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:31.449Z debug
+RESPONSE: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:21:31.449Z debug
+-- END CF API RESPONSE
+---
+
+--- 2026-03-11T14:21:31.451Z log
+👋 You are logged in with an Account API Token, associated with the account Rauldiazespejo@gmail.com's Account.
+---
+
+--- 2026-03-11T14:21:31.451Z log
+ℹ️  The API Token is read from the CLOUDFLARE_API_TOKEN environment variable.
+---
+
+--- 2026-03-11T14:21:31.465Z log
+┌────────────────────────────────────┬──────────────────────────────────┐
+│ Account Name                       │ Account ID                       │
+├────────────────────────────────────┼──────────────────────────────────┤
+│ Rauldiazespejo@gmail.com's Account │ 260115dd31e5efbd50ec938beedec2ff │
+└────────────────────────────────────┴──────────────────────────────────┘
+---
+
+--- 2026-03-11T14:21:31.466Z log
+🔓 To see token permissions visit https://dash.cloudflare.com/260115dd31e5efbd50ec938beedec2ff/api-tokens.
+---
+
+--- 2026-03-11T14:21:31.467Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"view accounts","timestamp":1773238891467,"properties":{"category":"Workers","wranglerVersion":"4.52.1","os":"linux:x64"}}
+---
+
+--- 2026-03-11T14:21:31.474Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command completed","timestamp":1773238891474,"properties":{"amplitude_session_id":1773238887983,"amplitude_event_id":1,"wranglerVersion":"4.52.1","osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"none","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"argsUsed":[],"argsCombination":"","command":"wrangler whoami","args":{},"durationMs":3509,"durationSeconds":3.509,"durationMinutes":0.05848333333333333}}
+---
+
+--- 2026-03-11T14:21:31.484Z debug
+Metrics dispatcher: Failed to send request: Too Many Requests
+---
+
+--- 2026-03-11T14:21:31.574Z debug
+Metrics dispatcher: Failed to send request: Too Many Requests
+---

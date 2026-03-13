@@ -1,0 +1,84 @@
+
+--- 2026-03-11T14:23:09.914Z debug
+🪵  Writing logs to "/home/user/.config/.wrangler/logs/wrangler-2026-03-11_14-23-09_615.log"
+---
+
+--- 2026-03-11T14:23:09.914Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command started","timestamp":1773238989914,"properties":{"amplitude_session_id":1773238989912,"amplitude_event_id":0,"wranglerVersion":"4.52.1","osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"jsonc","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"argsUsed":["productionBranch"],"argsCombination":"productionBranch","command":"wrangler pages project create","args":{}}}
+---
+
+--- 2026-03-11T14:23:09.924Z debug
+.env file not found at "/home/user/.env". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T14:23:09.925Z debug
+.env file not found at "/home/user/.env.local". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T14:23:09.975Z log
+
+ ⛅️ wrangler 4.52.1 (update available 4.72.0)
+─────────────────────────────────────────────
+---
+
+--- 2026-03-11T14:23:09.989Z debug
+No folder available to cache configuration
+---
+
+--- 2026-03-11T14:23:09.991Z debug
+-- START CF API REQUEST: GET https://api.cloudflare.com/client/v4/memberships
+---
+
+--- 2026-03-11T14:23:09.991Z debug
+QUERY STRING: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:23:09.991Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:23:09.991Z debug
+INIT: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:23:09.991Z debug
+-- END CF API REQUEST
+---
+
+--- 2026-03-11T14:23:10.063Z debug
+Metrics dispatcher: Failed to send request: Too Many Requests
+---
+
+--- 2026-03-11T14:23:10.199Z debug
+-- START CF API RESPONSE: Bad Request 400
+---
+
+--- 2026-03-11T14:23:10.201Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:23:10.201Z debug
+RESPONSE: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:23:10.201Z debug
+-- END CF API RESPONSE
+---
+
+--- 2026-03-11T14:23:10.206Z log
+
+---
+
+--- 2026-03-11T14:23:10.270Z error
+✘ [ERROR] A request to the Cloudflare API (/memberships) failed.
+
+  Authentication failed (status: 400) [code: 9106]
+  
+  If you think this is a bug, please open an issue at: https://github.com/cloudflare/workers-sdk/issues/new/choose
+
+
+---
+
+--- 2026-03-11T14:23:10.271Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command errored","timestamp":1773238990271,"properties":{"amplitude_session_id":1773238989912,"amplitude_event_id":1,"wranglerVersion":"4.52.1","osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"jsonc","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"argsUsed":["productionBranch"],"argsCombination":"productionBranch","command":"wrangler pages project create","args":{},"durationMs":396,"durationSeconds":0.396,"durationMinutes":0.0066,"errorType":"APIError"}}
+---

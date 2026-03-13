@@ -1,0 +1,43 @@
+
+--- 2026-03-11T13:18:17.613Z debug
+🪵  Writing logs to "/home/user/.config/.wrangler/logs/wrangler-2026-03-11_13-18-17_322.log"
+---
+
+--- 2026-03-11T13:18:17.612Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command started","timestamp":1773235097612,"properties":{"amplitude_session_id":1773235097607,"amplitude_event_id":0,"wranglerVersion":"4.52.1","osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"none","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"argsUsed":[],"argsCombination":"","command":"wrangler d1 create","args":{}}}
+---
+
+--- 2026-03-11T13:18:17.638Z debug
+.env file not found at "/home/user/.env". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T13:18:17.638Z debug
+.env file not found at "/home/user/.env.local". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T13:18:17.697Z log
+
+ ⛅️ wrangler 4.52.1 (update available 4.72.0)
+─────────────────────────────────────────────
+---
+
+--- 2026-03-11T13:18:17.716Z log
+
+---
+
+--- 2026-03-11T13:18:17.782Z error
+✘ [ERROR] In a non-interactive environment, it's necessary to set a CLOUDFLARE_API_TOKEN environment variable for wrangler to work. Please go to https://developers.cloudflare.com/fundamentals/api/get-started/create-token/ for instructions on how to create an api token, and assign its value to CLOUDFLARE_API_TOKEN.
+
+
+---
+
+--- 2026-03-11T13:18:17.783Z debug
+Error: In a non-interactive environment, it's necessary to set a CLOUDFLARE_API_TOKEN environment variable for wrangler to work. Please go to https://developers.cloudflare.com/fundamentals/api/get-started/create-token/ for instructions on how to create an api token, and assign its value to CLOUDFLARE_API_TOKEN.
+    at requireAuth (/usr/lib/node_modules/wrangler/wrangler-dist/cli.js:120442:13)
+    at async Object.handler (/usr/lib/node_modules/wrangler/wrangler-dist/cli.js:138449:27)
+    at async Object.handler (/usr/lib/node_modules/wrangler/wrangler-dist/cli.js:165091:7)
+---
+
+--- 2026-03-11T13:18:17.783Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command errored","timestamp":1773235097783,"properties":{"amplitude_session_id":1773235097607,"amplitude_event_id":1,"wranglerVersion":"4.52.1","osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"none","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"argsUsed":[],"argsCombination":"","command":"wrangler d1 create","args":{},"durationMs":209,"durationSeconds":0.209,"durationMinutes":0.003483333333333333,"errorType":"UserError"}}
+---

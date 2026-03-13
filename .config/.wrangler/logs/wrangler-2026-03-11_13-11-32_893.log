@@ -1,0 +1,42 @@
+
+--- 2026-03-11T13:11:33.212Z debug
+🪵  Writing logs to "/home/user/.config/.wrangler/logs/wrangler-2026-03-11_13-11-32_893.log"
+---
+
+--- 2026-03-11T13:11:33.212Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command started","timestamp":1773234693211,"properties":{"amplitude_session_id":1773234693209,"amplitude_event_id":0,"wranglerVersion":"4.52.1","osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"none","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"argsUsed":["local"],"argsCombination":"local","command":"wrangler d1 execute","args":{}}}
+---
+
+--- 2026-03-11T13:11:33.222Z debug
+.env file not found at "/home/user/.env". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T13:11:33.222Z debug
+.env file not found at "/home/user/.env.local". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T13:11:33.271Z log
+
+ ⛅️ wrangler 4.52.1 (update available 4.72.0)
+─────────────────────────────────────────────
+---
+
+--- 2026-03-11T13:11:33.273Z log
+Resource location: local 
+
+---
+
+--- 2026-03-11T13:11:33.273Z log
+Use --remote if you want to access the remote instance.
+
+---
+
+--- 2026-03-11T13:11:33.293Z log
+
+---
+
+--- 2026-03-11T13:11:33.405Z error
+✘ [ERROR] Couldn't find a D1 DB with the name or binding 'docusentinel-pro' in your Wrangler configuration file.
+
+
+---

@@ -1,0 +1,58 @@
+
+--- 2026-03-11T14:22:21.709Z debug
+🪵  Writing logs to "/home/user/.config/.wrangler/logs/wrangler-2026-03-11_14-22-21_360.log"
+---
+
+--- 2026-03-11T14:22:21.709Z debug
+.env file not found at "/home/user/webapp/.env". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T14:22:21.712Z debug
+.env file not found at "/home/user/webapp/.env.local". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T14:22:21.735Z log
+
+ ⛅️ wrangler 4.72.0
+───────────────────
+---
+
+--- 2026-03-11T14:22:21.749Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command started","timestamp":1773238941749,"properties":{"amplitude_session_id":1773238941746,"amplitude_event_id":0,"wranglerVersion":"4.72.0","wranglerMajorVersion":4,"wranglerMinorVersion":72,"wranglerPatchVersion":0,"osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"jsonc","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"agent":null,"argsUsed":[],"argsCombination":"","sanitizedCommand":"d1 create","sanitizedArgs":{}}}
+---
+
+--- 2026-03-11T14:22:21.820Z debug
+-- START CF API REQUEST: GET https://api.cloudflare.com/client/v4/memberships
+---
+
+--- 2026-03-11T14:22:21.820Z debug
+QUERY STRING: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:22:21.820Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:22:21.821Z debug
+INIT: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:22:21.821Z debug
+-- END CF API REQUEST
+---
+
+--- 2026-03-11T14:22:21.872Z debug
+Metrics dispatcher: Failed to send request: Too Many Requests
+---
+
+--- 2026-03-11T14:22:22.003Z debug
+-- START CF API RESPONSE: Bad Request 400
+---
+
+--- 2026-03-11T14:22:22.004Z debug
+HEADERS: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---
+
+--- 2026-03-11T14:22:22.004Z debug
+RESPONSE: omitted; set WRANGLER_LOG_SANITIZE=false to include sanitized data
+---

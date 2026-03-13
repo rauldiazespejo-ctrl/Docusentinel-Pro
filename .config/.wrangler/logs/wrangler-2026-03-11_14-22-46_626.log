@@ -1,0 +1,61 @@
+
+--- 2026-03-11T14:22:47.022Z debug
+🪵  Writing logs to "/home/user/.config/.wrangler/logs/wrangler-2026-03-11_14-22-46_626.log"
+---
+
+--- 2026-03-11T14:22:47.022Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command started","timestamp":1773238967021,"properties":{"amplitude_session_id":1773238967019,"amplitude_event_id":0,"wranglerVersion":"4.52.1","osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"jsonc","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"argsUsed":["projectName"],"argsCombination":"projectName","command":"wrangler pages deploy","args":{}}}
+---
+
+--- 2026-03-11T14:22:47.033Z debug
+.env file not found at "/home/user/.env". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T14:22:47.033Z debug
+.env file not found at "/home/user/.env.local". Continuing... For more details, refer to https://developers.cloudflare.com/workers/wrangler/system-environment-variables/
+---
+
+--- 2026-03-11T14:22:47.132Z log
+
+ ⛅️ wrangler 4.52.1 (update available 4.72.0)
+─────────────────────────────────────────────
+---
+
+--- 2026-03-11T14:22:47.161Z debug
+Configuration file belonging to ⚡️ Pages ⚡️ project detected.
+---
+
+--- 2026-03-11T14:22:47.163Z log
+
+---
+
+--- 2026-03-11T14:22:47.267Z error
+✘ [ERROR] Running configuration file validation for Pages:
+
+    - Configuration file cannot contain both both "main" and "pages_build_output_dir" configuration keys.
+      Please use "main" if you are deploying a Worker, or "pages_build_output_dir" if you are deploying a Pages project.
+    - Configuration file for Pages projects does not support "main"
+
+
+---
+
+--- 2026-03-11T14:22:47.267Z debug
+Error: Running configuration file validation for Pages:
+  - Configuration file cannot contain both both "main" and "pages_build_output_dir" configuration keys.
+    Please use "main" if you are deploying a Worker, or "pages_build_output_dir" if you are deploying a Pages project.
+  - Configuration file for Pages projects does not support "main"
+    at readPagesConfig (/usr/lib/node_modules/wrangler/wrangler-dist/cli.js:50125:11)
+    at Object.handler (/usr/lib/node_modules/wrangler/wrangler-dist/cli.js:218038:20)
+    at /usr/lib/node_modules/wrangler/wrangler-dist/cli.js:165109:20
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+    at run (/usr/lib/node_modules/wrangler/wrangler-dist/cli.js:47923:61)
+    at Object.handler (/usr/lib/node_modules/wrangler/wrangler-dist/cli.js:165091:13)
+---
+
+--- 2026-03-11T14:22:47.269Z debug
+Metrics dispatcher: Posting data {"deviceId":"438f7a03-a6d1-4b71-8b1d-beb69a723d8a","event":"wrangler command errored","timestamp":1773238967269,"properties":{"amplitude_session_id":1773238967019,"amplitude_event_id":1,"wranglerVersion":"4.52.1","osPlatform":"Linux","osVersion":"#1 SMP PREEMPT_DYNAMIC Thu May 29 17:08:06 CST 2025","nodeVersion":20,"packageManager":"npm","isFirstUsage":false,"configFileType":"jsonc","isCI":false,"isPagesCI":false,"isWorkersCI":false,"isInteractive":false,"hasAssets":false,"argsUsed":["projectName"],"argsCombination":"projectName","command":"wrangler pages deploy","args":{},"durationMs":287,"durationSeconds":0.287,"durationMinutes":0.004783333333333333,"errorType":"UserError"}}
+---
+
+--- 2026-03-11T14:22:47.340Z debug
+Metrics dispatcher: Failed to send request: Too Many Requests
+---

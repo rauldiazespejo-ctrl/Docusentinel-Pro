@@ -1,0 +1,7 @@
+[user]
+	name = rauldiazespejo-ctrl
+	email = rauldiazespejo-ctrl@users.noreply.github.com
+[init]
+	defaultBranch = main
+[credential]
+	helper = store
