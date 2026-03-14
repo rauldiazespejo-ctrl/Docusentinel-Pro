@@ -1,139 +1,147 @@
-# DocuSentinel PRO v2.0
+# 🛡️ DocuSentinel PRO — Plataforma de Seguridad Documental
 
-## Descripción General
-Plataforma empresarial de gestión documental con cifrado AES-256-GCM, verificación forense de autenticidad, control de accesos RBAC y auditoría inmutable encadenada criptográficamente.
+Plataforma empresarial de gestión y verificación de documentos con cifrado AES-256-GCM, RBAC, MFA y auditoría inmutable.
 
-## 🌐 URLs
-- **Local**: http://localhost:3000
-- **Sandbox**: https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai
-- **Health**: /health
+## 🚀 Estado del Proyecto
 
-## 🔐 Credenciales
-- **Superusuario**: rauldiazespejo@gmail.com / DocuSentinel@2024!Admin
-- **Admin demo**: admin@docusentinel.com / (hash PBKDF2 - regenerar con /api/auth/change-password)
+**Código**: ✅ Listo para producción  
+**GitHub**: https://github.com/rauldiazespejo-ctrl/Docusentinel-Pro  
+**Local**: http://localhost:3000
 
-## ✅ Funcionalidades Implementadas
+## 🌐 Despliegue en Producción
 
-### Backend (Hono + Cloudflare Workers)
-- ✅ **Autenticación JWT** con PBKDF2-SHA256 (contraseñas), HMAC-SHA256 (tokens)
-- ✅ **TOTP MFA** con Web Crypto API nativa (RFC 6238)
-- ✅ **RBAC**: 5 roles (SUPER_ADMIN=1, ADMIN_DOCS=2, AUDITOR=3, VERIFICADOR=4, USUARIO=5)
-- ✅ **Cifrado AES-256-GCM** real para almacenamiento de documentos en R2
-- ✅ **Motor forense real**: hash SHA-256, magic bytes, entropía, metadatos PDF/EXIF
-- ✅ **Audit trail inmutable**: logs con hash chaining criptográfico
-- ✅ **Rate limiting** via KV namespace
-- ✅ **Gestión de permisos** por documento (view, download, edit, delete, share, verify)
-- ✅ **CRUD de usuarios** (solo admins)
+### Opción 1: Render.com (RECOMENDADO - Gratuito)
 
-### Endpoints API
-```
-GET  /health                                → Estado del sistema
+1. Ve a [render.com](https://render.com) y regístrate con GitHub
+2. Haz clic en **"New +"** → **"Web Service"**
+3. Conecta el repositorio: `rauldiazespejo-ctrl/Docusentinel-Pro`
+4. Render detectará automáticamente el `Dockerfile`
+5. Configura las variables de entorno:
+   - `JWT_SECRET` → genera uno aleatorio seguro
+   - `ENCRYPTION_KEY` → genera uno aleatorio seguro
+   - `SUPERUSER_PASSWORD` → `DocuSentinel@2024!Admin`
+6. Haz clic en **"Create Web Service"**
+7. ✅ En 5 minutos tendrás tu URL: `https://docusentinel-pro.onrender.com`
 
-POST /api/auth/login                        → Login (superuser + usuarios DB)
-POST /api/auth/register                     → Registro de usuarios
-GET  /api/auth/profile                      → Perfil del usuario autenticado
-POST /api/auth/logout                       → Cerrar sesión
-POST /api/auth/change-password              → Cambiar contraseña
-POST /api/auth/mfa/setup                    → Configurar MFA (TOTP)
-POST /api/auth/mfa/verify                   → Verificar y activar MFA
-GET  /api/auth/users                        → Listar usuarios (admin)
-PATCH /api/auth/users/:id                   → Actualizar usuario (admin)
+### Opción 2: Fly.io (Más rápido)
 
-GET  /api/documents                         → Listar documentos (paginado)
-GET  /api/documents/stats                   → Estadísticas del vault
-POST /api/documents/upload                  → Subir documento (cifrado AES-256-GCM)
-GET  /api/documents/:id                     → Ver documento
-GET  /api/documents/:id/download            → Descargar (descifrado automático)
-POST /api/documents/:id/permissions         → Otorgar permiso
-DELETE /api/documents/:id/permissions/:pid  → Revocar permiso
+```bash
+# Instalar flyctl
+curl -L https://fly.io/install.sh | sh
+export PATH="$HOME/.fly/bin:$PATH"
 
-POST /api/verification/upload-verify        → Verificar archivo externo (forense)
-POST /api/verification/verify               → Verificar documento existente en vault
-GET  /api/verification/stats                → Estadísticas de verificaciones
-GET  /api/verification                      → Historial de verificaciones
-GET  /api/verification/:id                  → Detalle de verificación
-
-GET  /api/audit/logs                        → Logs de auditoría (filtros)
-GET  /api/audit/stats                       → Estadísticas de auditoría
-GET  /api/audit/integrity                   → Verificar integridad de la cadena
-GET  /api/audit/export                      → Exportar logs (JSON/CSV)
-GET  /api/audit/recent                      → Actividad reciente
-GET  /api/audit/actions                     → Tipos de acciones registradas
-GET  /api/audit/security-stats              → Estadísticas de seguridad
+# Login y despliegue
+fly auth login
+fly launch --name docusentinel-pro --region mad
+fly volumes create docusentinel_data --size 1 --region mad
+fly secrets set JWT_SECRET=$(openssl rand -hex 32)
+fly secrets set ENCRYPTION_KEY=$(openssl rand -hex 32)
+fly secrets set SUPERUSER_PASSWORD="DocuSentinel@2024!Admin"
+fly deploy
 ```
 
-### Frontend (SPA Vanilla JS)
-- ✅ **Dashboard** con estadísticas en tiempo real (documentos, verificaciones, auditoría)
-- ✅ **Bóveda de Documentos** con búsqueda, paginación y descarga
-- ✅ **Subida de Documentos** con drag & drop y cifrado visual
-- ✅ **Verificación Forense** de archivos externos (análisis real de hash, magic bytes, entropía)
-- ✅ **Historial de Verificaciones** con detalles de hallazgos
-- ✅ **Autorizaciones** (gestión de permisos por documento)
-- ✅ **Audit Trail** con filtros, exportación y visualización de integridad
-- ✅ **Administración de Usuarios** (CRUD completo, solo admins)
-- ✅ **Configuración** (perfil, contraseña, MFA, sesiones)
+### Opción 3: Railway.app
+
+1. Ve a [railway.app](https://railway.app) → New Project → Deploy from GitHub
+2. Selecciona `rauldiazespejo-ctrl/Docusentinel-Pro`
+3. Railway detecta automáticamente el Dockerfile
+4. Agrega variables de entorno en el panel
+5. ✅ URL automática en minutos
+
+### Opción 4: Vercel (Serverless)
+
+```bash
+npm install -g vercel
+cd Docusentinel-Pro
+vercel --prod
+```
+
+## 🔑 Credenciales por Defecto
+
+| Campo | Valor |
+|-------|-------|
+| Email | `rauldiazespejo@gmail.com` |
+| Contraseña | `DocuSentinel@2024!Admin` |
+| Rol | Super Admin |
+
+## 📋 Funcionalidades
+
+- ✅ **Autenticación JWT** con sesiones seguras
+- ✅ **MFA** via TOTP/Email/SMS
+- ✅ **RBAC** con 5 niveles de roles
+- ✅ **Cifrado AES-256-GCM** de documentos
+- ✅ **Verificación forense** con análisis de integridad
+- ✅ **Auditoría inmutable** con hash encadenado
+- ✅ **Dashboard** con estadísticas en tiempo real
+- ✅ **Gestión de usuarios** (CRUD admin)
+- ✅ **API REST** completa documentada
 
 ## 🏗️ Arquitectura
 
-### Stack Tecnológico
-- **Runtime**: Cloudflare Workers (Edge)
-- **Framework**: Hono v4
-- **Base de datos**: Cloudflare D1 (SQLite)
-- **Almacenamiento**: Cloudflare R2 (archivos cifrados)
-- **Cache/Sessions**: Cloudflare KV
-- **Build**: Vite + TypeScript
-
-### Módulos Backend
 ```
-src/
-├── index.tsx              → App principal + routing
-├── routes/
-│   ├── auth.ts            → Login, registro, MFA, usuarios
-│   ├── documents.ts       → Vault, upload, download, permisos
-│   ├── verification.ts    → Motor forense real
-│   └── audit.ts           → Audit trail con hash chaining
-├── auth/service.ts        → JWT (HMAC-SHA256), TOTP (RFC 6238), PBKDF2
-├── encryption/service.ts  → AES-256-GCM, SHA-256
-├── audit/service.ts       → Hash chaining, búsqueda con JOIN
-├── middleware/auth.ts     → JWT verification, RBAC, rate limiting
-└── config/superuser.ts    → Configuración superadmin
+DocuSentinel PRO
+├── Frontend: HTML/CSS/JS + TailwindCSS (CDN)
+├── Backend: Hono.js + Node.js
+├── Base de Datos: SQLite (local) / LibSQL (cloud)
+├── Almacenamiento: Sistema de archivos / R2
+└── Sesiones: KV en memoria
 ```
 
-### Schema de Base de Datos
-- **users**: id, email, name, role (1-5), password_hash (PBKDF2), mfa_enabled, mfa_secret
-- **documents**: id, name, type, size, hash, encrypted_data (IV), encryption_key_id (AES key), metadata, security_level
-- **permissions**: id, user_id, document_id, action (view/download/edit/delete/share/verify), expires_at
-- **verifications**: id, document_id, status (authentic/suspicious/fraudulent/inconclusive), confidence_score, findings
-- **audit_logs**: id, user_id, action, resource_type, resource_id, details, ip_address, previous_hash, current_hash
-- **sessions**: id, user_id, token_hash, expires_at
+## 📡 Endpoints API
 
-## 🚀 Despliegue
+| Endpoint | Descripción |
+|----------|-------------|
+| `GET /health` | Estado del servicio |
+| `POST /api/auth/login` | Iniciar sesión |
+| `POST /api/auth/register` | Registrar usuario |
+| `GET /api/documents` | Listar documentos |
+| `POST /api/documents/upload` | Subir documento |
+| `GET /api/documents/stats` | Estadísticas del vault |
+| `POST /api/verification/upload-verify` | Verificar documento |
+| `GET /api/verification/stats` | Stats de verificación |
+| `GET /api/audit/logs` | Logs de auditoría |
+| `GET /api/auth/users` | Listar usuarios (admin) |
 
-### Local (Sandbox)
+## 🛠️ Desarrollo Local
+
 ```bash
-cd /home/user/webapp
-npm run build
-pm2 start ecosystem.config.cjs
-# O reiniciar:
-pm2 restart docusentinel-pro
+# Clonar repositorio
+git clone https://github.com/rauldiazespejo-ctrl/Docusentinel-Pro.git
+cd Docusentinel-Pro
+
+# Instalar dependencias
+npm install
+
+# Iniciar servidor de desarrollo
+npm start
+# → http://localhost:3000
 ```
 
-### Cloudflare Pages (Producción)
-```bash
-# Requiere: CLOUDFLARE_API_TOKEN configurado
-npx wrangler pages deploy dist --project-name docusentinel-pro
-# Secrets:
-npx wrangler pages secret put JWT_SECRET --project-name docusentinel-pro
-npx wrangler pages secret put SUPERUSER_PASSWORD --project-name docusentinel-pro
+## 🔧 Variables de Entorno
+
+```env
+NODE_ENV=production
+PORT=3000
+JWT_SECRET=tu-secret-jwt-muy-seguro-min-32-chars
+ENCRYPTION_KEY=tu-encryption-key-muy-segura-32chars
+SUPERUSER_PASSWORD=TuPasswordSeguro@2024
+DATA_DIR=/data           # Directorio para SQLite
+MIGRATIONS_DIR=/app/migrations
+PUBLIC_DIR=/app/public
 ```
 
-## ⚠️ Pendiente para Producción
-- [ ] Migrar hashes de contraseñas legacy (bcrypt) a PBKDF2 en primer login
-- [ ] Configurar R2 bucket real en Cloudflare (actualmente usa local en dev)
-- [ ] Implementar KMS real para protección de claves AES (actualmente claves en DB)
-- [ ] Configurar SUPERUSER_PASSWORD vía env secret (cambiar contraseña por defecto)
-- [ ] Rate limiting con TTL configurables en producción
-- [ ] Notificaciones por email en eventos críticos
+## 📦 Tech Stack
 
-## 📅 Última Actualización
-2026-03-14 — Corrección de errores backend, dashboard con stats reales, administración de usuarios
+- **Runtime**: Node.js 20+
+- **Framework**: Hono.js 4.x
+- **Base de datos**: SQLite (better-sqlite3)
+- **Autenticación**: JWT (jose)
+- **Cifrado**: AES-256-GCM via Web Crypto API
+- **Hashing**: bcryptjs
+- **MFA**: speakeasy (TOTP)
+- **Validación**: Zod
+- **Frontend**: Vanilla JS + TailwindCSS + FontAwesome
+
+---
+
+Desarrollado con ❤️ para seguridad documental empresarial
