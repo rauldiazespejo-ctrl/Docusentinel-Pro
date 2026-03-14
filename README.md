@@ -2,146 +2,120 @@
 
 Plataforma empresarial de gestión y verificación de documentos con cifrado AES-256-GCM, RBAC, MFA y auditoría inmutable.
 
-## 🚀 Estado del Proyecto
+## 🌐 URL de Producción
 
-**Código**: ✅ Listo para producción  
-**GitHub**: https://github.com/rauldiazespejo-ctrl/Docusentinel-Pro  
-**Local**: http://localhost:3000
+**🔗 https://ranges-survivors-although-concrete.trycloudflare.com**
 
-## 🌐 Despliegue en Producción
+> Servidor activo: Node.js 20 + Hono.js + SQLite | Túnel: Cloudflare Quick Tunnel
 
-### Opción 1: Render.com (RECOMENDADO - Gratuito)
+## 🔑 Credenciales de Acceso
 
-1. Ve a [render.com](https://render.com) y regístrate con GitHub
-2. Haz clic en **"New +"** → **"Web Service"**
-3. Conecta el repositorio: `rauldiazespejo-ctrl/Docusentinel-Pro`
-4. Render detectará automáticamente el `Dockerfile`
-5. Configura las variables de entorno:
-   - `JWT_SECRET` → genera uno aleatorio seguro
-   - `ENCRYPTION_KEY` → genera uno aleatorio seguro
-   - `SUPERUSER_PASSWORD` → `DocuSentinel@2024!Admin`
-6. Haz clic en **"Create Web Service"**
-7. ✅ En 5 minutos tendrás tu URL: `https://docusentinel-pro.onrender.com`
+| Campo | Valor |
+|-------|-------|
+| **Email** | `rauldiazespejo@gmail.com` |
+| **Contraseña** | `DocuSentinel@2024!Admin` |
+| **Rol** | Super Admin (acceso total) |
 
-### Opción 2: Fly.io (Más rápido)
+## 📋 Funcionalidades Implementadas
 
+- ✅ **Autenticación JWT** con sesiones seguras (24h)
+- ✅ **MFA** via TOTP/Email/SMS con QR code
+- ✅ **RBAC** con 5 niveles: Super Admin, Admin Docs, Auditor, Verificador, Usuario
+- ✅ **Cifrado AES-256-GCM** de documentos
+- ✅ **Verificación forense** con análisis de integridad (hash, firma, entropía, tipografía)
+- ✅ **Auditoría inmutable** con hash encadenado (blockchain-like)
+- ✅ **Dashboard** con estadísticas en tiempo real
+- ✅ **Gestión de usuarios** (CRUD completo para admin)
+- ✅ **Upload de documentos** con cifrado automático
+- ✅ **Rate limiting** por IP via KV
+- ✅ **API REST** completa con 15+ endpoints
+
+## 🚀 Despliegue en Producción Permanente
+
+### Opción 1: Render.com (GRATIS - Recomendado)
+1. Ve a **[render.com](https://render.com)** → New Web Service
+2. Conecta: `github.com/rauldiazespejo-ctrl/Docusentinel-Pro`
+3. Render detecta el `Dockerfile` automáticamente
+4. Variables de entorno a configurar:
+   ```
+   JWT_SECRET=<genera uno seguro>
+   ENCRYPTION_KEY=<genera uno seguro>
+   SUPERUSER_PASSWORD=DocuSentinel@2024!Admin
+   ```
+5. ✅ URL automática: `https://docusentinel-pro.onrender.com`
+
+### Opción 2: Fly.io
 ```bash
-# Instalar flyctl
-curl -L https://fly.io/install.sh | sh
-export PATH="$HOME/.fly/bin:$PATH"
-
-# Login y despliegue
 fly auth login
-fly launch --name docusentinel-pro --region mad
-fly volumes create docusentinel_data --size 1 --region mad
+fly launch --name docusentinel-pro
+fly volumes create docusentinel_data --size 1
 fly secrets set JWT_SECRET=$(openssl rand -hex 32)
-fly secrets set ENCRYPTION_KEY=$(openssl rand -hex 32)
-fly secrets set SUPERUSER_PASSWORD="DocuSentinel@2024!Admin"
 fly deploy
 ```
 
 ### Opción 3: Railway.app
-
-1. Ve a [railway.app](https://railway.app) → New Project → Deploy from GitHub
+1. New Project → Deploy from GitHub
 2. Selecciona `rauldiazespejo-ctrl/Docusentinel-Pro`
-3. Railway detecta automáticamente el Dockerfile
-4. Agrega variables de entorno en el panel
-5. ✅ URL automática en minutos
+3. Variables de entorno y deploy automático
 
-### Opción 4: Vercel (Serverless)
+## 📡 API Endpoints
+
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/health` | GET | Estado del servicio |
+| `/api/auth/login` | POST | Iniciar sesión |
+| `/api/auth/register` | POST | Registrar usuario |
+| `/api/auth/profile` | GET | Perfil del usuario |
+| `/api/auth/users` | GET | Listar usuarios (admin) |
+| `/api/documents` | GET | Listar documentos |
+| `/api/documents/upload` | POST | Subir documento |
+| `/api/documents/stats` | GET | Estadísticas del vault |
+| `/api/documents/:id/download` | GET | Descargar documento |
+| `/api/verification/upload-verify` | POST | Verificar documento |
+| `/api/verification/stats` | GET | Stats de verificación |
+| `/api/audit/logs` | GET | Logs de auditoría |
+| `/api/audit/stats` | GET | Estadísticas de auditoría |
+| `/api/audit/recent` | GET | Actividad reciente |
+
+## 🏗️ Arquitectura Técnica
+
+```
+DocuSentinel PRO v2.0
+├── Runtime: Node.js 20 LTS
+├── Framework: Hono.js 4.x (edge-ready)
+├── Base de Datos: SQLite (better-sqlite3)
+├── Cifrado: AES-256-GCM (Web Crypto API)
+├── Auth: JWT (jose) + bcryptjs
+├── MFA: speakeasy (TOTP/HOTP)
+├── Validación: Zod schemas
+├── Frontend: Vanilla JS + TailwindCSS CDN
+└── Deploy: Docker + Cloudflare Tunnel
+```
+
+## 🔧 Desarrollo Local
 
 ```bash
-npm install -g vercel
-cd Docusentinel-Pro
-vercel --prod
-```
-
-## 🔑 Credenciales por Defecto
-
-| Campo | Valor |
-|-------|-------|
-| Email | `rauldiazespejo@gmail.com` |
-| Contraseña | `DocuSentinel@2024!Admin` |
-| Rol | Super Admin |
-
-## 📋 Funcionalidades
-
-- ✅ **Autenticación JWT** con sesiones seguras
-- ✅ **MFA** via TOTP/Email/SMS
-- ✅ **RBAC** con 5 niveles de roles
-- ✅ **Cifrado AES-256-GCM** de documentos
-- ✅ **Verificación forense** con análisis de integridad
-- ✅ **Auditoría inmutable** con hash encadenado
-- ✅ **Dashboard** con estadísticas en tiempo real
-- ✅ **Gestión de usuarios** (CRUD admin)
-- ✅ **API REST** completa documentada
-
-## 🏗️ Arquitectura
-
-```
-DocuSentinel PRO
-├── Frontend: HTML/CSS/JS + TailwindCSS (CDN)
-├── Backend: Hono.js + Node.js
-├── Base de Datos: SQLite (local) / LibSQL (cloud)
-├── Almacenamiento: Sistema de archivos / R2
-└── Sesiones: KV en memoria
-```
-
-## 📡 Endpoints API
-
-| Endpoint | Descripción |
-|----------|-------------|
-| `GET /health` | Estado del servicio |
-| `POST /api/auth/login` | Iniciar sesión |
-| `POST /api/auth/register` | Registrar usuario |
-| `GET /api/documents` | Listar documentos |
-| `POST /api/documents/upload` | Subir documento |
-| `GET /api/documents/stats` | Estadísticas del vault |
-| `POST /api/verification/upload-verify` | Verificar documento |
-| `GET /api/verification/stats` | Stats de verificación |
-| `GET /api/audit/logs` | Logs de auditoría |
-| `GET /api/auth/users` | Listar usuarios (admin) |
-
-## 🛠️ Desarrollo Local
-
-```bash
-# Clonar repositorio
 git clone https://github.com/rauldiazespejo-ctrl/Docusentinel-Pro.git
 cd Docusentinel-Pro
-
-# Instalar dependencias
 npm install
-
-# Iniciar servidor de desarrollo
+npm run build:server
 npm start
 # → http://localhost:3000
 ```
 
-## 🔧 Variables de Entorno
+## 📦 Variables de Entorno
 
 ```env
 NODE_ENV=production
 PORT=3000
-JWT_SECRET=tu-secret-jwt-muy-seguro-min-32-chars
-ENCRYPTION_KEY=tu-encryption-key-muy-segura-32chars
+JWT_SECRET=min-32-chars-muy-seguro
+ENCRYPTION_KEY=exactamente-32-caracteres-aqui!!
 SUPERUSER_PASSWORD=TuPasswordSeguro@2024
-DATA_DIR=/data           # Directorio para SQLite
+DATA_DIR=/data
 MIGRATIONS_DIR=/app/migrations
 PUBLIC_DIR=/app/public
 ```
 
-## 📦 Tech Stack
-
-- **Runtime**: Node.js 20+
-- **Framework**: Hono.js 4.x
-- **Base de datos**: SQLite (better-sqlite3)
-- **Autenticación**: JWT (jose)
-- **Cifrado**: AES-256-GCM via Web Crypto API
-- **Hashing**: bcryptjs
-- **MFA**: speakeasy (TOTP)
-- **Validación**: Zod
-- **Frontend**: Vanilla JS + TailwindCSS + FontAwesome
-
 ---
-
-Desarrollado con ❤️ para seguridad documental empresarial
+**GitHub**: https://github.com/rauldiazespejo-ctrl/Docusentinel-Pro  
+**Versión**: 2.0.0 | **Última actualización**: 2026-03-14

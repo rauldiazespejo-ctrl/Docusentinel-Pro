@@ -14,7 +14,7 @@ const authMiddleware = new AuthMiddleware()
 // Middleware global
 app.use('*', logger())
 app.use('*', cors({
-  origin: ['http://localhost:3000', 'https://docusentinel-pro.pages.dev', 'https://*.pages.dev'],
+  origin: ['*'],
   credentials: true,
   maxAge: 86400
 }))
