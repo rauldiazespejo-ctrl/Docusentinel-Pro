@@ -10,10 +10,30 @@ pids
 *.seed
 *.pid.lock
 
-# Build outputs
+# Build outputs - CF Pages
 dist/
 build/
 *.tsbuildinfo
+
+# Data (SQLite database - generated at runtime)
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# dist-server individual files (keep the mjs bundle for Vercel)
+dist-server/adapters/
+dist-server/audit/
+dist-server/auth/
+dist-server/config/
+dist-server/encryption/
+dist-server/middleware/
+dist-server/routes/
+dist-server/types/
+dist-server/renderer.js
+dist-server/index.js
+dist-server/server.cjs
+dist-server/server.js
 
 # Environment variables
 .env
@@ -67,7 +87,3 @@ Thumbs.db
 # Large files
 docusentinelpro*.tar.gz
 docusentinelpro*.zip
-
-# Local development
-webapp_backup/
-webapp_new/

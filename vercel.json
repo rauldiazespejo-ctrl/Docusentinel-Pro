@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build:server",
+  "installCommand": "npm install",
+  "outputDirectory": "dist-server",
+  "framework": null,
+  "builds": [
+    {
+      "src": "dist-server/server.mjs",
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "includeFiles": [
+          "migrations/**",
+          "public/**"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/dist-server/server.mjs"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist-server/server.mjs"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "regions": ["iad1"]
+}
