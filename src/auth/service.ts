@@ -1,381 +1,240 @@
-import { User, MFACredentials, MFAType } from '../types';
-import { EncryptionService } from '../encryption/service';
-import { SUPERUSER_CONFIG, authenticateSuperuser } from '../config/superuser';
+import { SUPERUSER_CONFIG } from '../config/superuser';
 
 /**
- * Servicio de autenticación multifactor
- * Implementa TOTP, WebAuthn y SMS
+ * Servicio de autenticación - Producción
+ * Usa Web Crypto API nativa (compatible con Cloudflare Workers)
  */
 export class AuthService {
-  private encryptionService: EncryptionService;
-  
-  constructor() {
-    this.encryptionService = new EncryptionService();
-  }
 
-  /**
-   * Genera un secreto TOTP para el usuario
-   */
+  // ─── TOTP ────────────────────────────────────────────────────────
+
   async generateTOTPSecret(email: string): Promise<{ secret: string; qrCode: string }> {
-    // Generar secreto base32 de 32 caracteres
     const secret = this.generateBase32Secret();
-    
-    // Crear URI para TOTP
-    const issuer = 'DocuSentinel Pro';
-    const uri = `otpauth://totp/${issuer}:${email}?secret=${secret}&issuer=${issuer}&algorithm=SHA256&digits=6&period=30`;
-    
-    // Generar QR code (en producción, usar librería qrcode)
-    const qrCode = this.generateQRCode(uri);
-    
-    return {
-      secret,
-      qrCode
-    };
+    const issuer = 'DocuSentinel PRO';
+    const uri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+    const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uri)}`;
+    return { secret, qrCode };
   }
 
-  /**
-   * Verifica un código TOTP
-   */
   async verifyTOTP(token: string, secret: string): Promise<boolean> {
     if (!token || !secret) return false;
-    
-    // Normalizar token
     token = token.replace(/\s/g, '');
-    
-    if (token.length !== 6 || !/^\d{6}$/.test(token)) {
-      return false;
+    if (!/^\d{6}$/.test(token)) return false;
+
+    const currentStep = Math.floor(Date.now() / 1000 / 30);
+    // Allow ±1 time window
+    for (let i = -1; i <= 1; i++) {
+      const expected = await this.generateTOTPToken(secret, currentStep + i);
+      if (this.safeCompare(token, expected)) return true;
     }
-
-    try {
-      // Generar token esperado
-      const expectedToken = this.generateTOTPToken(secret);
-      
-      // Comparar (permitir un margen de tiempo)
-      const currentTime = Math.floor(Date.now() / 1000);
-      const timeWindow = 30; // 30 segundos
-      
-      for (let i = -1; i <= 1; i++) {
-        const timeStep = Math.floor((currentTime + (i * timeWindow)) / timeWindow);
-        const tokenAtTime = this.generateTOTPTokenAtTime(secret, timeStep);
-        
-        if (this.constantTimeComparison(token, tokenAtTime)) {
-          return true;
-        }
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Error verificando TOTP:', error);
-      return false;
-    }
+    return false;
   }
 
-  /**
-   * Genera un token TOTP basado en el tiempo actual
-   */
-  private generateTOTPToken(secret: string): string {
-    const timeStep = Math.floor(Date.now() / 1000 / 30);
-    return this.generateTOTPTokenAtTime(secret, timeStep);
+  private async generateTOTPToken(secret: string, timeStep: number): Promise<string> {
+    const keyBytes = this.base32Decode(secret);
+    const counter = new Uint8Array(8);
+    const view = new DataView(counter.buffer);
+    // Big-endian 64-bit counter
+    view.setUint32(0, Math.floor(timeStep / 2 ** 32), false);
+    view.setUint32(4, timeStep >>> 0, false);
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', keyBytes,
+      { name: 'HMAC', hash: 'SHA-1' },
+      false, ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', cryptoKey, counter);
+    const hash = new Uint8Array(sig);
+    const offset = hash[hash.length - 1] & 0x0f;
+    const code = (
+      ((hash[offset] & 0x7f) << 24) |
+      ((hash[offset + 1] & 0xff) << 16) |
+      ((hash[offset + 2] & 0xff) << 8) |
+      (hash[offset + 3] & 0xff)
+    ) % 1000000;
+    return code.toString().padStart(6, '0');
   }
 
-  /**
-   * Genera un token TOTP para un paso de tiempo específico
-   */
-  private generateTOTPTokenAtTime(secret: string, timeStep: number): string {
-    // Convertir secreto base32 a bytes
-    const secretBytes = this.base32Decode(secret);
-    
-    // Convertir timeStep a bytes (big-endian)
-    const timeBytes = new Uint8Array(8);
-    const view = new DataView(timeBytes.buffer);
-    view.setUint32(4, timeStep, false); // Los 4 bytes más significativos
-    
-    // Generar HMAC-SHA256
-    const hmac = this.computeHMAC(secretBytes, timeBytes);
-    
-    // Extraer offset dinámico
-    const offset = hmac[hmac.length - 1] & 0x0F;
-    
-    // Extraer 4 bytes dinámicos
-    const truncatedHash = new DataView(hmac.buffer, offset, 4);
-    const code = truncatedHash.getUint32(0, false) & 0x7FFFFFFF;
-    
-    // Convertir a 6 dígitos
-    return (code % 1000000).toString().padStart(6, '0');
-  }
-
-  /**
-   * Genera un secreto base32 aleatorio
-   */
   private generateBase32Secret(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    let secret = '';
-    
-    for (let i = 0; i < 32; i++) {
-      secret += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    
-    return secret;
-  }
-
-  /**
-   * Decodifica una cadena base32
-   */
-  private base32Decode(base32: string): Uint8Array {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    const bits = [];
-    
-    for (const char of base32.toUpperCase()) {
-      const index = chars.indexOf(char);
-      if (index !== -1) {
-        bits.push(...this.intToBits(index, 5));
-      }
-    }
-    
-    const bytes = [];
-    for (let i = 0; i < bits.length; i += 8) {
-      const byte = this.bitsToInt(bits.slice(i, i + 8));
-      bytes.push(byte);
-    }
-    
-    return new Uint8Array(bytes);
-  }
-
-  /**
-   * Convierte un entero a array de bits
-   */
-  private intToBits(n: number, length: number): number[] {
-    const bits = [];
-    for (let i = 0; i < length; i++) {
-      bits.unshift((n >> i) & 1);
-    }
-    return bits;
-  }
-
-  /**
-   * Convierte array de bits a entero
-   */
-  private bitsToInt(bits: number[]): number {
-    let result = 0;
-    for (let i = 0; i < bits.length; i++) {
-      result = (result << 1) | bits[i];
-    }
+    const bytes = crypto.getRandomValues(new Uint8Array(20));
+    let result = '';
+    for (const b of bytes) result += chars[b % 32];
     return result;
   }
 
-  /**
-   * Computa HMAC-SHA256
-   */
-  private computeHMAC(key: Uint8Array, data: Uint8Array): Uint8Array {
-    // Simulación de HMAC - en producción usar Web Crypto API
-    // Esto es una implementación simplificada para demostración
-    const combined = new Uint8Array(key.length + data.length);
-    combined.set(key);
-    combined.set(data, key.length);
-    
-    // Hash simple simulado
-    const hash = [];
-    for (let i = 0; i < 32; i++) {
-      hash[i] = combined[i % combined.length] ^ i;
+  private base32Decode(base32: string): Uint8Array {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    const clean = base32.toUpperCase().replace(/=+$/, '');
+    let bits = 0, value = 0;
+    const output: number[] = [];
+    for (const char of clean) {
+      const idx = chars.indexOf(char);
+      if (idx === -1) continue;
+      value = (value << 5) | idx;
+      bits += 5;
+      if (bits >= 8) {
+        output.push((value >>> (bits - 8)) & 0xff);
+        bits -= 8;
+      }
     }
-    
-    return new Uint8Array(hash);
+    return new Uint8Array(output);
   }
 
+  // ─── PASSWORD ────────────────────────────────────────────────────
+
   /**
-   * Comparación en tiempo constante para evitar timing attacks
+   * Hash de contraseña con PBKDF2-SHA256 (Web Crypto API nativa)
+   * Formato: pbkdf2:salt_hex:iterations:hash_hex
    */
-  private constantTimeComparison(a: string, b: string): boolean {
-    if (a.length !== b.length) return false;
-    
-    let result = 0;
-    for (let i = 0; i < a.length; i++) {
-      result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  async hashPassword(password: string): Promise<string> {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iterations = 100000;
+
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(password),
+      'PBKDF2', false, ['deriveBits']
+    );
+
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+      keyMaterial, 256
+    );
+
+    const saltHex = this.bufToHex(salt);
+    const hashHex = this.bufToHex(new Uint8Array(bits));
+    return `pbkdf2:${saltHex}:${iterations}:${hashHex}`;
+  }
+
+  async verifyPassword(password: string, storedHash: string): Promise<boolean> {
+    try {
+      // Soporte para hashes legacy bcrypt del seed (formato $2a$...)
+      if (storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$')) {
+        // bcrypt no disponible en Workers; comparación directa para seed de demo
+        // En producción real, usar bcrypt worker externo o rehashear en primer login
+        return false; // Los usuarios del seed no podrán loguearse (solo superuser y nuevos registros)
+      }
+
+      if (!storedHash.startsWith('pbkdf2:')) return false;
+      const parts = storedHash.split(':');
+      if (parts.length !== 4) return false;
+
+      const [, saltHex, iterStr, hashHex] = parts;
+      const iterations = parseInt(iterStr);
+      const salt = this.hexToBuf(saltHex);
+      const expectedHash = this.hexToBuf(hashHex);
+
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(password),
+        'PBKDF2', false, ['deriveBits']
+      );
+
+      const bits = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+        keyMaterial, 256
+      );
+
+      const computedHash = new Uint8Array(bits);
+      return this.safeCompare(
+        this.bufToHex(computedHash),
+        this.bufToHex(expectedHash)
+      );
+    } catch {
+      return false;
     }
-    
-    return result === 0;
   }
 
-  /**
-   * Genera un código QR (simulado para demostración)
-   */
-  private generateQRCode(data: string): string {
-    // En producción, usar librería qrcode para generar QR real
-    return `QR_CODE_DATA:${btoa(data)}`;
-  }
+  // ─── JWT ─────────────────────────────────────────────────────────
 
-  /**
-   * Genera un token JWT seguro
-   */
-  async generateJWT(payload: any, secret: string, expiresIn: number = 3600): Promise<string> {
-    const header = {
-      alg: 'HS256',
-      typ: 'JWT'
-    };
-    
+  async generateJWT(payload: any, secret: string, expiresIn = 86400): Promise<string> {
+    const header = this.b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
     const now = Math.floor(Date.now() / 1000);
-    const jwtPayload = {
-      ...payload,
-      iat: now,
-      exp: now + expiresIn
-    };
-    
-    const headerEncoded = this.base64URLEncode(JSON.stringify(header));
-    const payloadEncoded = this.base64URLEncode(JSON.stringify(jwtPayload));
-    
-    const signatureInput = `${headerEncoded}.${payloadEncoded}`;
-    const signature = await this.generateJWTSignature(signatureInput, secret);
-    
-    return `${signatureInput}.${signature}`;
+    const body = this.b64url(JSON.stringify({ ...payload, iat: now, exp: now + expiresIn }));
+    const sig = await this.hmacSign(`${header}.${body}`, secret);
+    return `${header}.${body}.${sig}`;
   }
 
-  /**
-   * Verifica un token JWT
-   */
   async verifyJWT(token: string, secret: string): Promise<any> {
     const parts = token.split('.');
-    if (parts.length !== 3) {
-      throw new Error('Token JWT inválido');
+    if (parts.length !== 3) throw new Error('Token inválido');
+
+    const [header, body, sig] = parts;
+    const expectedSig = await this.hmacSign(`${header}.${body}`, secret);
+    if (!this.safeCompare(sig, expectedSig)) throw new Error('Firma inválida');
+
+    const payload = JSON.parse(atob(body.replace(/-/g, '+').replace(/_/g, '/')));
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      throw new Error('Token expirado');
     }
-    
-    const [headerEncoded, payloadEncoded, signature] = parts;
-    const signatureInput = `${headerEncoded}.${payloadEncoded}`;
-    
-    // Verificar firma
-    const expectedSignature = await this.generateJWTSignature(signatureInput, secret);
-    if (!this.constantTimeComparison(signature, expectedSignature)) {
-      throw new Error('Firma JWT inválida');
-    }
-    
-    // Decodificar payload
-    const payload = JSON.parse(this.base64URLDecode(payloadEncoded));
-    
-    // Verificar expiración
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) {
-      throw new Error('Token JWT expirado');
-    }
-    
     return payload;
   }
 
-  /**
-   * Autentica al superusuario
-   */
-  async authenticateSuperuser(email: string, password: string): Promise<{ user: any, token: string } | null> {
-    // Verificar si es el superusuario
-    if (email === SUPERUSER_CONFIG.email && password === SUPERUSER_CONFIG.password) {
-      // Generar token para el superusuario
-      const token = await this.generateJWT({
-        email: SUPERUSER_CONFIG.email,
-        role: SUPERUSER_CONFIG.role,
-        name: SUPERUSER_CONFIG.name,
-        isSuperuser: true
-      }, process.env.JWT_SECRET || 'default-secret-key');
-
-      return {
-        user: {
-          email: SUPERUSER_CONFIG.email,
-          name: SUPERUSER_CONFIG.name,
-          role: SUPERUSER_CONFIG.role,
-          isActive: SUPERUSER_CONFIG.isActive,
-          permissions: SUPERUSER_CONFIG.permissions
-        },
-        token
-      };
-    }
-    return null;
-  }
-
-  /**
-   * Genera firma para JWT
-   */
-  private async generateJWTSignature(data: string, secret: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(secret);
-    
+  private async hmacSign(data: string, secret: string): Promise<string> {
     const key = await crypto.subtle.importKey(
-      'raw',
-      keyData,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
+      'raw', new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
     );
-    
-    const dataBuffer = encoder.encode(data);
-    const signature = await crypto.subtle.sign('HMAC', key, dataBuffer);
-    
-    return this.base64URLEncode(new Uint8Array(signature));
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
+    return this.b64url(new Uint8Array(sig));
   }
 
-  /**
-   * Codifica a Base64 URL-safe
-   */
-  private base64URLEncode(data: string | Uint8Array): string {
-    const str = data instanceof Uint8Array ? 
-      String.fromCharCode(...data) : data;
-    return btoa(str)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+  // ─── HASH ────────────────────────────────────────────────────────
+
+  async hashData(data: string): Promise<string> {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+    return this.bufToHex(new Uint8Array(buf));
   }
 
-  /**
-   * Decodifica de Base64 URL-safe
-   */
-  private base64URLDecode(data: string): string {
-    // Añadir padding si es necesario
-    const padding = '='.repeat((4 - data.length % 4) % 4);
-    const base64 = data.replace(/-/g, '+').replace(/_/g, '/') + padding;
-    return atob(base64);
+  async hashBuffer(buffer: ArrayBuffer): Promise<string> {
+    const buf = await crypto.subtle.digest('SHA-256', buffer);
+    return this.bufToHex(new Uint8Array(buf));
   }
 
-  /**
-   * Hashea una contraseña de forma segura
-   */
-  async hashPassword(password: string): Promise<string> {
-    // En producción, usar bcrypt real
-    // Esto es una simulación para demostración
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const saltedPassword = password + this.arrayBufferToHex(salt);
-    
-    // Simular hashing con múltiples rondas
-    let hash = saltedPassword;
-    for (let i = 0; i < 12; i++) {
-      hash = btoa(hash + i);
+  // ─── SUPERUSER ───────────────────────────────────────────────────
+
+  async authenticateSuperuser(email: string, password: string): Promise<{ user: any; token: string } | null> {
+    const defaultPass = 'DocuSentinel@2024!Admin';
+    return this.authenticateSuperuserWithPassword(email, password, defaultPass,
+      'docusentinel-dev-secret-change-in-production-minimum-32-chars');
+  }
+
+  async authenticateSuperuserWithPassword(email: string, password: string, expectedPassword: string, jwtSecret: string): Promise<{ user: any; token: string } | null> {
+    if (email !== SUPERUSER_CONFIG.email || password !== expectedPassword) return null;
+    const token = await this.generateJWT(
+      { userId: 'superuser', email, role: 1, name: SUPERUSER_CONFIG.name, isSuperuser: true },
+      jwtSecret
+    );
+    return {
+      user: { id: 'superuser', email, name: SUPERUSER_CONFIG.name, role: 1, mfaEnabled: false },
+      token
+    };
+  }
+
+  // ─── UTILS ───────────────────────────────────────────────────────
+
+  private b64url(data: string | Uint8Array): string {
+    const str = data instanceof Uint8Array
+      ? String.fromCharCode(...data)
+      : data;
+    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  }
+
+  private bufToHex(buf: Uint8Array): string {
+    return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  private hexToBuf(hex: string): Uint8Array {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
     }
-    
-    return `$2a$12$${this.base64URLEncode(salt)}$${hash}`;
+    return bytes;
   }
 
-  /**
-   * Verifica una contraseña
-   */
-  async verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-    // Extraer salt del hash
-    const parts = hashedPassword.split('$');
-    if (parts.length < 4) return false;
-    
-    const salt = this.base64URLDecode(parts[3]);
-    const saltedPassword = password + salt;
-    
-    // Simular el mismo proceso de hashing
-    let hash = saltedPassword;
-    for (let i = 0; i < 12; i++) {
-      hash = btoa(hash + i);
-    }
-    
-    const expectedHash = `$2a$12$${parts[3]}$${hash}`;
-    return this.constantTimeComparison(hashedPassword, expectedHash);
-  }
-
-  /**
-   * Convierte ArrayBuffer a string hex
-   */
-  private arrayBufferToHex(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    return Array.from(bytes)
-      .map(byte => byte.toString(16).padStart(2, '0'))
-      .join('');
+  private safeCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    let result = 0;
+    for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return result === 0;
   }
 }

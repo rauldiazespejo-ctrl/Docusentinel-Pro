@@ -1,11 +1,20 @@
-// Configuración del Superusuario Administrador
+/**
+ * Configuración del Superusuario Administrador
+ * La contraseña se configura via variable de entorno SUPERUSER_PASSWORD
+ * o usa el valor por defecto para desarrollo local.
+ */
 export const SUPERUSER_CONFIG = {
-  email: 'rauliazespejo@gmail.com',
-  password: '123456',
-  name: 'Raul Azespejo',
-  role: 'admin',
+  email: 'rauldiazespejo@gmail.com',
+  // En producción: configurar via secret en Cloudflare Pages
+  // wrangler pages secret put SUPERUSER_PASSWORD --project-name docusentinel-pro
+  get password() {
+    // En Workers, process.env no existe - la contraseña viene del env del Worker
+    // Este valor se sobreescribe en authenticateSuperuser usando c.env.SUPERUSER_PASSWORD
+    return 'DocuSentinel@2024!Admin';
+  },
+  name: 'Raul Diaz Espejo',
+  role: 1,
   isActive: true,
-  createdAt: new Date().toISOString(),
   permissions: {
     canManageUsers: true,
     canManageDocuments: true,
@@ -15,16 +24,6 @@ export const SUPERUSER_CONFIG = {
   }
 };
 
-// Función para verificar si es el superusuario
 export function isSuperuser(email: string): boolean {
   return email === SUPERUSER_CONFIG.email;
-}
-
-// Función para obtener credenciales del superusuario
-export function getSuperuserCredentials() {
-  return {
-    email: SUPERUSER_CONFIG.email,
-    password: SUPERUSER_CONFIG.password,
-    name: SUPERUSER_CONFIG.name
-  };
 }

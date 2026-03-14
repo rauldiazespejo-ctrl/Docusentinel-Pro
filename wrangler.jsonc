@@ -1,7 +1,40 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "docusentinel-pro",
+  "main": "src/index.tsx",
   "compatibility_date": "2024-01-01",
   "compatibility_flags": ["nodejs_compat"],
-  "pages_build_output_dir": "./dist"
+  "pages_build_output_dir": "./dist",
+
+  // D1 Database - SQLite en Cloudflare Edge
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "docusentinel-pro",
+      "database_id": "00000000-0000-0000-0000-000000000001"
+    }
+  ],
+
+  // KV Storage para sesiones y caché
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "00000000000000000000000000000001",
+      "preview_id": "00000000000000000000000000000001"
+    }
+  ],
+
+  // R2 Storage para documentos cifrados
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "docusentinel-pro-bucket"
+    }
+  ],
+
+  // Variables de entorno para desarrollo local
+  "vars": {
+    "JWT_SECRET": "docusentinel-dev-secret-change-in-production-minimum-32-chars",
+    "ENCRYPTION_KEY": "docusentinel-encryption-key-dev-change-in-prod"
+  }
 }

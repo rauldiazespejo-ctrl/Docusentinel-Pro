@@ -23,7 +23,8 @@ export class AuditService {
     details: Record<string, any>,
     ipAddress: string,
     userAgent: string,
-    db: D1Database
+    db: D1Database,
+    actorEmail?: string
   ): Promise<AuditLog> {
     try {
       // Obtener el hash del log anterior
@@ -199,6 +200,87 @@ export class AuditService {
   }
 
   /**
+   * Busca logs con información de usuario (JOIN con tabla users)
+   */
+  async searchLogsWithUsers(
+    db: D1Database,
+    filters: {
+      userId?: string;
+      action?: string;
+      resourceType?: string;
+      resourceId?: string;
+      startDate?: Date;
+      endDate?: Date;
+      ipAddress?: string;
+    },
+    limit: number = 100,
+    offset: number = 0
+  ): Promise<{ logs: any[]; total: number }> {
+    try {
+      // Construir cláusulas WHERE dinámicas
+      const conditions: string[] = ['1=1'];
+      const filterParams: any[] = [];
+
+      if (filters.userId) { conditions.push('al.user_id = ?'); filterParams.push(filters.userId); }
+      if (filters.action) { conditions.push('al.action = ?'); filterParams.push(filters.action); }
+      if (filters.resourceType) { conditions.push('al.resource_type = ?'); filterParams.push(filters.resourceType); }
+      if (filters.resourceId) { conditions.push('al.resource_id = ?'); filterParams.push(filters.resourceId); }
+      if (filters.startDate) { conditions.push('al.timestamp >= ?'); filterParams.push(filters.startDate.toISOString()); }
+      if (filters.endDate) { conditions.push('al.timestamp <= ?'); filterParams.push(filters.endDate.toISOString()); }
+      if (filters.ipAddress) { conditions.push('al.ip_address = ?'); filterParams.push(filters.ipAddress); }
+
+      const whereClause = 'WHERE ' + conditions.join(' AND ');
+
+      // Siempre incluimos limit y offset al final de los params
+      const countParams = [...filterParams];
+      const queryParams = [...filterParams, limit, offset];
+
+      // COUNT query
+      const countStmt = db.prepare(`SELECT COUNT(*) as count FROM audit_logs al ${whereClause}`);
+      const countResult = countParams.length > 0
+        ? await countStmt.bind(...countParams).first()
+        : await countStmt.first();
+      const total = (countResult?.count as number) || 0;
+
+      // Main query - siempre tiene al menos limit y offset
+      const mainQuery = `
+        SELECT al.*,
+               u.email as actor_email,
+               u.name as actor_name,
+               u.role as actor_role
+        FROM audit_logs al
+        LEFT JOIN users u ON al.user_id = u.id
+        ${whereClause}
+        ORDER BY al.timestamp DESC
+        LIMIT ? OFFSET ?`;
+
+      const queryResults = await db.prepare(mainQuery).bind(...queryParams).all();
+
+      const logs = queryResults.results.map((row: any) => ({
+        id: row.id,
+        userId: row.user_id,
+        actorEmail: row.actor_email || (row.user_id === 'superuser' ? 'rauldiazespejo@gmail.com' : row.user_id),
+        actorName: row.actor_name || (row.user_id === 'superuser' ? 'Raul Diaz Espejo' : 'Sistema'),
+        actorRole: row.actor_role,
+        action: row.action,
+        resourceType: row.resource_type,
+        resourceId: row.resource_id,
+        details: (() => { try { return JSON.parse(row.details || '{}'); } catch { return {}; } })(),
+        ipAddress: row.ip_address,
+        userAgent: row.user_agent,
+        timestamp: new Date(row.timestamp),
+        previousHash: row.previous_hash,
+        currentHash: row.current_hash
+      }));
+
+      return { logs, total };
+    } catch (error) {
+      console.error('Error al buscar logs con usuarios:', error);
+      return { logs: [], total: 0 };
+    }
+  }
+
+  /**
    * Busca logs con filtros
    */
   async searchLogs(
@@ -257,15 +339,17 @@ export class AuditService {
       
       // Contar total
       const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as count');
-      const countResult = await db.prepare(countQuery).bind(...params).first();
+      const countResult = params.length > 0
+        ? await db.prepare(countQuery).bind(...params).first()
+        : await db.prepare(countQuery).first();
       const total = countResult?.count as number || 0;
       
       // Agregar orden y límite
       query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
-      params.push(limit, offset);
+      const allParams = [...params, limit, offset];
       
       // Ejecutar consulta
-      const results = await db.prepare(query).bind(...params).all();
+      const results = await db.prepare(query).bind(...allParams).all();
       
       const logs: AuditLog[] = results.results.map((row: any) => ({
         id: row.id,
@@ -315,18 +399,15 @@ export class AuditService {
       }
       
       // Total de eventos
-      const totalResult = await db.prepare(`
-        SELECT COUNT(*) as total FROM audit_logs${dateFilter}
-      `).bind(...params).first();
+      const totalResult = params.length > 0
+        ? await db.prepare(`SELECT COUNT(*) as total FROM audit_logs${dateFilter}`).bind(...params).first()
+        : await db.prepare(`SELECT COUNT(*) as total FROM audit_logs${dateFilter}`).first();
       const totalEvents = totalResult?.total as number || 0;
       
       // Eventos por acción
-      const actionResults = await db.prepare(`
-        SELECT action, COUNT(*) as count 
-        FROM audit_logs${dateFilter}
-        GROUP BY action
-        ORDER BY count DESC
-      `).bind(...params).all();
+      const actionResults = params.length > 0
+        ? await db.prepare(`SELECT action, COUNT(*) as count FROM audit_logs${dateFilter} GROUP BY action ORDER BY count DESC`).bind(...params).all()
+        : await db.prepare(`SELECT action, COUNT(*) as count FROM audit_logs${dateFilter} GROUP BY action ORDER BY count DESC`).all();
       
       const eventsByAction: Record<string, number> = {};
       actionResults.results.forEach((row: any) => {
@@ -334,12 +415,9 @@ export class AuditService {
       });
       
       // Eventos por tipo de recurso
-      const resourceResults = await db.prepare(`
-        SELECT resource_type, COUNT(*) as count 
-        FROM audit_logs${dateFilter}
-        GROUP BY resource_type
-        ORDER BY count DESC
-      `).bind(...params).all();
+      const resourceResults = params.length > 0
+        ? await db.prepare(`SELECT resource_type, COUNT(*) as count FROM audit_logs${dateFilter} GROUP BY resource_type ORDER BY count DESC`).bind(...params).all()
+        : await db.prepare(`SELECT resource_type, COUNT(*) as count FROM audit_logs${dateFilter} GROUP BY resource_type ORDER BY count DESC`).all();
       
       const eventsByResource: Record<string, number> = {};
       resourceResults.results.forEach((row: any) => {
@@ -347,10 +425,9 @@ export class AuditService {
       });
       
       // Usuarios únicos
-      const uniqueResult = await db.prepare(`
-        SELECT COUNT(DISTINCT user_id) as unique_users 
-        FROM audit_logs${dateFilter}
-      `).bind(...params).first();
+      const uniqueResult = params.length > 0
+        ? await db.prepare(`SELECT COUNT(DISTINCT user_id) as unique_users FROM audit_logs${dateFilter}`).bind(...params).first()
+        : await db.prepare(`SELECT COUNT(DISTINCT user_id) as unique_users FROM audit_logs${dateFilter}`).first();
       const uniqueUsers = uniqueResult?.unique_users as number || 0;
       
       // Estado de integridad

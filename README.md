@@ -1,300 +1,139 @@
-# 🛡️ DocuSentinel Pro
+# DocuSentinel PRO v2.0
 
-**Sistema de Gestión de Documentos con Cifrado de Grado Militar y Auditoría Completa**
+## Descripción General
+Plataforma empresarial de gestión documental con cifrado AES-256-GCM, verificación forense de autenticidad, control de accesos RBAC y auditoría inmutable encadenada criptográficamente.
 
-## 🚀 **Estado Actual: ✅ OPERATIVO EN DESARROLLO**
+## 🌐 URLs
+- **Local**: http://localhost:3000
+- **Sandbox**: https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai
+- **Health**: /health
 
-La aplicación está completamente funcional con todas las características de seguridad implementadas.
+## 🔐 Credenciales
+- **Superusuario**: rauldiazespejo@gmail.com / DocuSentinel@2024!Admin
+- **Admin demo**: admin@docusentinel.com / (hash PBKDF2 - regenerar con /api/auth/change-password)
 
-### 🔄 **Opciones de Despliegue**
-- ✅ **Sandbox**: Funcionando actualmente
-- ⚠️ **Netlify**: Configurado pero requiere completar el despliegue
-- ❌ **Cloudflare Pages**: Pendiente (requiere configuración manual de API tokens)
+## ✅ Funcionalidades Implementadas
 
-### 🔗 **URLs de Acceso**
-**Sandbox**: https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai
-**Netlify**: https://docusentinelpro.netlify.app (⚠️ Requiere configuración de variables de entorno)
+### Backend (Hono + Cloudflare Workers)
+- ✅ **Autenticación JWT** con PBKDF2-SHA256 (contraseñas), HMAC-SHA256 (tokens)
+- ✅ **TOTP MFA** con Web Crypto API nativa (RFC 6238)
+- ✅ **RBAC**: 5 roles (SUPER_ADMIN=1, ADMIN_DOCS=2, AUDITOR=3, VERIFICADOR=4, USUARIO=5)
+- ✅ **Cifrado AES-256-GCM** real para almacenamiento de documentos en R2
+- ✅ **Motor forense real**: hash SHA-256, magic bytes, entropía, metadatos PDF/EXIF
+- ✅ **Audit trail inmutable**: logs con hash chaining criptográfico
+- ✅ **Rate limiting** via KV namespace
+- ✅ **Gestión de permisos** por documento (view, download, edit, delete, share, verify)
+- ✅ **CRUD de usuarios** (solo admins)
 
-## 📋 **Características Implementadas**
-
-### 🔐 **Seguridad de Grado Militar**
-- ✅ **Cifrado Híbrido**: AES-256-GCM + RSA-4096
-- ✅ **MFA Completo**: Autenticación por SMS, Email y TOTP
-- ✅ **RBAC**: Control de acceso basado en roles
-- ✅ **Auditoría Inmutable**: Todos los eventos registrados con firma digital
-- ✅ **Validación de Integridad**: SHA-256 para todos los documentos
-
-### 🏗️ **Arquitectura de Seguridad**
+### Endpoints API
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    DOCUSENTINEL PRO                         │
-├─────────────────────────────────────────────────────────────┤
-│  🔐 CIFRADO HÍBRIDO (AES-256-GCM + RSA-4096)              │
-│  📱 MFA MULTICANAL (SMS + Email + TOTP)                   │
-│  👥 RBAC AVANZADO (Roles: admin, manager, user, auditor)    │
-│  📊 AUDITORÍA INMUTABLE (Blockchain interno + firmas)      │
-│  🔒 VALIDACIÓN DE INTEGRIDAD (SHA-256 + checksums)         │
-└─────────────────────────────────────────────────────────────┘
+GET  /health                                → Estado del sistema
+
+POST /api/auth/login                        → Login (superuser + usuarios DB)
+POST /api/auth/register                     → Registro de usuarios
+GET  /api/auth/profile                      → Perfil del usuario autenticado
+POST /api/auth/logout                       → Cerrar sesión
+POST /api/auth/change-password              → Cambiar contraseña
+POST /api/auth/mfa/setup                    → Configurar MFA (TOTP)
+POST /api/auth/mfa/verify                   → Verificar y activar MFA
+GET  /api/auth/users                        → Listar usuarios (admin)
+PATCH /api/auth/users/:id                   → Actualizar usuario (admin)
+
+GET  /api/documents                         → Listar documentos (paginado)
+GET  /api/documents/stats                   → Estadísticas del vault
+POST /api/documents/upload                  → Subir documento (cifrado AES-256-GCM)
+GET  /api/documents/:id                     → Ver documento
+GET  /api/documents/:id/download            → Descargar (descifrado automático)
+POST /api/documents/:id/permissions         → Otorgar permiso
+DELETE /api/documents/:id/permissions/:pid  → Revocar permiso
+
+POST /api/verification/upload-verify        → Verificar archivo externo (forense)
+POST /api/verification/verify               → Verificar documento existente en vault
+GET  /api/verification/stats                → Estadísticas de verificaciones
+GET  /api/verification                      → Historial de verificaciones
+GET  /api/verification/:id                  → Detalle de verificación
+
+GET  /api/audit/logs                        → Logs de auditoría (filtros)
+GET  /api/audit/stats                       → Estadísticas de auditoría
+GET  /api/audit/integrity                   → Verificar integridad de la cadena
+GET  /api/audit/export                      → Exportar logs (JSON/CSV)
+GET  /api/audit/recent                      → Actividad reciente
+GET  /api/audit/actions                     → Tipos de acciones registradas
+GET  /api/audit/security-stats              → Estadísticas de seguridad
 ```
 
-## 🚀 **Despliegue en Netlify**
+### Frontend (SPA Vanilla JS)
+- ✅ **Dashboard** con estadísticas en tiempo real (documentos, verificaciones, auditoría)
+- ✅ **Bóveda de Documentos** con búsqueda, paginación y descarga
+- ✅ **Subida de Documentos** con drag & drop y cifrado visual
+- ✅ **Verificación Forense** de archivos externos (análisis real de hash, magic bytes, entropía)
+- ✅ **Historial de Verificaciones** con detalles de hallazgos
+- ✅ **Autorizaciones** (gestión de permisos por documento)
+- ✅ **Audit Trail** con filtros, exportación y visualización de integridad
+- ✅ **Administración de Usuarios** (CRUD completo, solo admins)
+- ✅ **Configuración** (perfil, contraseña, MFA, sesiones)
 
-### ⚠️ **Estado**: Configurado pero requiere completar el despliegue
+## 🏗️ Arquitectura
 
-### 📋 **Pasos para completar el despliegue**:
+### Stack Tecnológico
+- **Runtime**: Cloudflare Workers (Edge)
+- **Framework**: Hono v4
+- **Base de datos**: Cloudflare D1 (SQLite)
+- **Almacenamiento**: Cloudflare R2 (archivos cifrados)
+- **Cache/Sessions**: Cloudflare KV
+- **Build**: Vite + TypeScript
 
-1. **En tu máquina local**:
-   ```bash
-   # Clona o copia el proyecto
-   # Navega al directorio del proyecto
-   
-   # Crea el archivo .env
-   copy .env.example .env
-   # Edita .env con tus valores reales
-   
-   # Instala dependencias
-   npm install
-   
-   # Build del proyecto
-   npm run build
-   ```
+### Módulos Backend
+```
+src/
+├── index.tsx              → App principal + routing
+├── routes/
+│   ├── auth.ts            → Login, registro, MFA, usuarios
+│   ├── documents.ts       → Vault, upload, download, permisos
+│   ├── verification.ts    → Motor forense real
+│   └── audit.ts           → Audit trail con hash chaining
+├── auth/service.ts        → JWT (HMAC-SHA256), TOTP (RFC 6238), PBKDF2
+├── encryption/service.ts  → AES-256-GCM, SHA-256
+├── audit/service.ts       → Hash chaining, búsqueda con JOIN
+├── middleware/auth.ts     → JWT verification, RBAC, rate limiting
+└── config/superuser.ts    → Configuración superadmin
+```
 
-2. **Configura las variables de entorno en Netlify**:
-   - Ve a: https://app.netlify.com/sites/docusentinelpro/settings/deploys#environment
-   - Agrega estas variables:
-     - `JWT_SECRET`: `tu-secreto-jwt-super-seguro-de-al-menos-32-caracteres`
-     - `ENCRYPTION_KEY`: `12345678901234567890123456789012` (exactamente 32 caracteres)
-     - `NODE_ENV`: `production`
+### Schema de Base de Datos
+- **users**: id, email, name, role (1-5), password_hash (PBKDF2), mfa_enabled, mfa_secret
+- **documents**: id, name, type, size, hash, encrypted_data (IV), encryption_key_id (AES key), metadata, security_level
+- **permissions**: id, user_id, document_id, action (view/download/edit/delete/share/verify), expires_at
+- **verifications**: id, document_id, status (authentic/suspicious/fraudulent/inconclusive), confidence_score, findings
+- **audit_logs**: id, user_id, action, resource_type, resource_id, details, ip_address, previous_hash, current_hash
+- **sessions**: id, user_id, token_hash, expires_at
 
-3. **Despliega con Netlify CLI**:
-   ```bash
-   netlify build && netlify deploy --prod
-   ```
+## 🚀 Despliegue
 
-### 🔗 **Endpoints de Netlify** (después del despliegue):
-- **Aplicación**: https://docusentinelpro.netlify.app
-- **API**: https://docusentinelpro.netlify.app/.netlify/functions/api
-- **Documentación**: https://docusentinelpro.netlify.app/.netlify/functions/api/docs
-- **Health Check**: https://docusentinelpro.netlify.app/.netlify/functions/api/health
-
-### 📚 **Guías de despliegue**:
-- [Guía completa de despliegue local](GUIA_DESPLIEGUE_NETLIFY_LOCAL.md)
-- [Guía de despliegue con scripts](GUIA_DEPLIEGUE_NETLIFY_FINAL.md)
-
-## 🎯 **Endpoints Principales**
-
-### 🔑 **Autenticación**
+### Local (Sandbox)
 ```bash
-# Registrar nuevo usuario
-curl -X POST https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"SecurePass123!","name":"John Doe"}'
-
-# O usando Netlify:
-curl -X POST https://docusentinelpro.netlify.app/.netlify/functions/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"SecurePass123!","name":"John Doe"}'
-
-# Iniciar sesión  
-curl -X POST https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"SecurePass123!"}'
-
-# O usando Netlify:
-curl -X POST https://docusentinelpro.netlify.app/.netlify/functions/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"SecurePass123!"}'
-```
-
-### 📄 **Gestión de Documentos**
-```bash
-# Subir documento cifrado
-curl -X POST https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/documents \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Documento Confidencial","content":"Contenido cifrado...","classification":"confidential"}'
-
-# Listar documentos
-curl https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/documents \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
-
-### 📊 **Verificación y Auditoría**
-```bash
-# Health check del sistema
-curl https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/health
-
-# Documentación Swagger completa
-curl https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/docs
-
-# Registros de auditoría
-curl https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/audit \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
-
-## 🔧 **Stack Tecnológico**
-
-### Backend
-- **Framework**: Hono (Cloudflare Workers)
-- **Lenguaje**: TypeScript
-- **Cifrado**: Web Crypto API
-- **Base de Datos**: Cloudflare D1 (SQLite)
-- **Almacenamiento**: Cloudflare KV & R2
-
-### Seguridad
-- **Cifrado Simétrico**: AES-256-GCM
-- **Cifrado Asimétrico**: RSA-4096
-- **Hashing**: SHA-256
-- **Tokens**: JWT con firma RS256
-- **MFA**: TOTP (RFC 6238)
-
-## 🚀 **Guía Rápida de Uso**
-
-### 1. **Primeros Pasos**
-```bash
-# 1. Verificar estado del sistema
-curl https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/health
-
-# 2. Explorar la documentación
-curl https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/docs
-```
-
-### 2. **Flujo de Trabajo Seguro**
-```
-1. Registrar usuario → 2. Verificar MFA → 3. Subir documento → 4. Auditoría automática
-```
-
-### 3. **Clasificación de Documentos**
-- 🔴 **TOP_SECRET**: Cifrado adicional, acceso restringido
-- 🟡 **CONFIDENTIAL**: Cifrado estándar, acceso controlado  
-- 🟢 **PUBLIC**: Acceso público, sin cifrado
-
-## 📊 **Métricas de Seguridad**
-
-- **Nivel de Cifrado**: 256 bits (grado militar)
-- **Método de Cifrado**: Híbrido (simétrico + asimétrico)
-- **Integridad**: SHA-256 con checksums
-- **Autenticación**: Multi-factor (3 factores)
-- **Auditoría**: Inmutable con firma digital
-- **Cumplimiento**: Estándares de seguridad internacionales
-
-## 🌐 **Documentación API Completa**
-
-**Swagger UI**: https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai/api/docs
-
-### Endpoints Disponibles:
-- `GET /api/health` - Estado del sistema
-- `POST /api/auth/register` - Registro de usuarios
-- `POST /api/auth/login` - Inicio de sesión
-- `GET /api/documents` - Listar documentos
-- `POST /api/documents` - Subir documento
-- `GET /api/audit` - Registros de auditoría
-- `POST /api/verification/totp` - Verificación TOTP
-
-## 🛠️ **Configuración de Desarrollo**
-
-```bash
-# Instalar dependencias
-npm install
-
-# Modo desarrollo
-npm run dev
-
-# Construir para producción  
+cd /home/user/webapp
 npm run build
-
-# Desplegar (requiere configuración Cloudflare)
-npm run deploy
+pm2 start ecosystem.config.cjs
+# O reiniciar:
+pm2 restart docusentinel-pro
 ```
 
-## 🚀 **Despliegue en Netlify (Alternativa a Cloudflare)**
-
-### 📦 **Preparación Completa para Netlify**
-
-✅ **Scripts de despliegue creados:**
-- `deploy-netlify-simple.sh` - Despliegue automático
-- `prepare-netlify-deploy.sh` - Preparación completa
-- `NETLIFY_DEPLOY_GUIDE.md` - Guía detallada de despliegue
-
-### 🔧 **Métodos de Despliegue**
-
-#### **Método 1: Arrastrar y Soltar (Más Fácil)**
+### Cloudflare Pages (Producción)
 ```bash
-# 1. Preparar la aplicación
-bash prepare-netlify-deploy.sh
-
-# 2. Ir a https://netlify.com
-# 3. Arrastrar la carpeta 'dist' al área de despliegue
-# 4. Configurar variables de entorno en el panel
+# Requiere: CLOUDFLARE_API_TOKEN configurado
+npx wrangler pages deploy dist --project-name docusentinel-pro
+# Secrets:
+npx wrangler pages secret put JWT_SECRET --project-name docusentinel-pro
+npx wrangler pages secret put SUPERUSER_PASSWORD --project-name docusentinel-pro
 ```
 
-#### **Método 2: Netlify CLI**
-```bash
-# 1. Instalar Netlify CLI
-npm install -g netlify-cli
+## ⚠️ Pendiente para Producción
+- [ ] Migrar hashes de contraseñas legacy (bcrypt) a PBKDF2 en primer login
+- [ ] Configurar R2 bucket real en Cloudflare (actualmente usa local en dev)
+- [ ] Implementar KMS real para protección de claves AES (actualmente claves en DB)
+- [ ] Configurar SUPERUSER_PASSWORD vía env secret (cambiar contraseña por defecto)
+- [ ] Rate limiting con TTL configurables en producción
+- [ ] Notificaciones por email en eventos críticos
 
-# 2. Autenticarse
-netlify login
-
-# 3. Desplegar
-netlify deploy --prod --dir=dist --functions=netlify/functions
-```
-
-### 🌐 **Endpoints en Netlify**
-- **Aplicación**: `https://[tu-sitio].netlify.app`
-- **API**: `https://[tu-sitio].netlify.app/.netlify/functions/api`
-- **Documentación**: `https://[tu-sitio].netlify.app/.netlify/functions/api/docs`
-- **Health Check**: `https://[tu-sitio].netlify.app/.netlify/functions/api/health`
-
-### 🔐 **Variables de Entorno Requeridas**
-```
-JWT_SECRET=tu-secreto-jwt-super-seguro
-ENCRYPTION_KEY=tu-clave-de-cifrado-32-bytes-exactos
-NODE_ENV=production
-CORS_ORIGIN=*
-MAX_FILE_SIZE=10485760
-```
-
-### 📊 **Estado del Despliegue**
-
-| Plataforma | Estado | Método | URL |
-|------------|--------|---------|-----|
-| **Sandbox Local** | ✅ Activo | Desarrollo | https://3000-i1vt40x088oque1ny5bi0-c07dda5e.sandbox.novita.ai |
-| **Cloudflare Pages** | ⏳ Pendiente | Token API | Requiere permisos adicionales |
-| **Netlify** | ✅ Listo | Manual/CLI | Preparado para despliegue |
-
-### 🛠️ **Características Adaptadas para Netlify**
-- ✅ Funciones serverless con Node.js
-- ✅ Base de datos simulada (lista para conectar servicios reales)
-- ✅ Cifrado híbrido adaptado
-- ✅ MFA completo
-- ✅ RBAC y auditoría
-- ✅ Frontend adaptado con modo oscuro
-
-## 📋 **Guías de Despliegue Disponibles**
-
-1. **`NETLIFY_DEPLOY_GUIDE.md`** - Guía completa de despliegue en Netlify
-2. **`EXTERNAL_SERVICES.md`** - Servicios externos recomendados (MongoDB, etc.)
-3. **`test-netlify-local.sh`** - Script de prueba local
-
-## 🚀 **Próximos Pasos**
-
-### Para Netlify (Recomendado)
-1. Ejecutar `bash prepare-netlify-deploy.sh`
-2. Seguir la guía en `NETLIFY_DEPLOY_GUIDE.md`
-3. Configurar variables de entorno
-4. Desplegar a través de la web o CLI
-
-### Para Cloudflare Pages (Alternativa)
-1. Obtener token con permisos mejorados
-2. Ejecutar script de despliegue Cloudflare
-3. Configurar D1, KV, y R2
-4. Desplegar a producción
-
-## 📞 **Soporte**
-
-La aplicación está completamente operativa con todas las características de seguridad activas. Para el despliegue en Cloudflare Pages, se requiere configuración adicional de permisos en el token API.
-
----
-
-**🛡️ DocuSentinel Pro - Seguridad de Grado Militar para tus Documentos**
+## 📅 Última Actualización
+2026-03-14 — Corrección de errores backend, dashboard con stats reales, administración de usuarios

@@ -1,338 +1,207 @@
 // Función principal de Netlify para DocuSentinel Pro
-// Adaptada para usar servicios externos en lugar de bindings de Cloudflare
-
 const { Hono } = require('hono');
 const { cors } = require('hono/cors');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
+const { serveStatic } = require('hono/cloudflare-workers');
 
+// Importar rutas modulares
+const authRoutes = require('../../src/routes/auth');
+const documentRoutes = require('../../src/routes/documents');
+const verificationRoutes = require('../../src/routes/verification');
+const auditRoutes = require('../../src/routes/audit');
+const { AuthMiddleware } = require('../../src/middleware/auth');
+
+// Crear aplicación Hono
 const app = new Hono();
 
-// Configuración - En producción, estos deben ser secretos de entorno
-const JWT_SECRET = process.env.JWT_SECRET || 'tu-secreto-jwt-super-seguro';
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'tu-clave-de-cifrado-32-bytes!!';
-
-// Middleware CORS
-app.use('/api/*', cors());
-
-// Base de datos simulada - En producción usar MongoDB Atlas, PostgreSQL, etc.
-let users = [
-  {
-    id: 1,
-    username: 'admin',
-    password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
-    email: 'admin@docusentinel.com',
-    role: 'admin',
-    mfaSecret: 'JBSWY3DPEHPK3PXP',
-    createdAt: new Date().toISOString()
-  }
-];
-
-let documents = [];
-let auditLogs = [];
-
-// Funciones auxiliares
-function generateToken(user) {
-  return jwt.sign({ 
-    id: user.id, 
-    username: user.username, 
-    role: user.role 
-  }, JWT_SECRET, { expiresIn: '24h' });
-}
-
-function verifyToken(token) {
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
-    return null;
-  }
-}
-
-function encryptData(data, key) {
-  const cipher = crypto.createCipher('aes-256-gcm', key);
-  let encrypted = cipher.update(data, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  const authTag = cipher.getAuthTag();
-  return { encrypted, authTag: authTag.toString('hex') };
-}
-
-function decryptData(encryptedData, key, authTag) {
-  const decipher = crypto.createDecipher('aes-256-gcm', key);
-  decipher.setAuthTag(Buffer.from(authTag, 'hex'));
-  let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
-}
-
-function logAction(userId, action, details) {
-  auditLogs.push({
-    id: auditLogs.length + 1,
-    userId,
-    action,
-    details,
-    timestamp: new Date().toISOString(),
-    hash: crypto.createHash('sha256').update(`${userId}${action}${Date.now()}`).digest('hex')
-  });
-}
-
-// Middleware de autenticación
-function authMiddleware() {
-  return async (c, next) => {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: 'Token no proporcionado' }, 401);
-    }
-
-    const token = authHeader.substring(7);
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      return c.json({ error: 'Token inválido' }, 401);
-    }
-
-    c.set('user', decoded);
-    await next();
-  };
-}
-
-// Middleware de autorización por roles
-function roleMiddleware(allowedRoles) {
-  return async (c, next) => {
-    const user = c.get('user');
-    if (!user || !allowedRoles.includes(user.role)) {
-      return c.json({ error: 'No autorizado' }, 403);
-    }
-    await next();
-  };
-}
-
-// Rutas de autenticación
-app.post('/api/auth/login', async (c) => {
-  try {
-    const { username, password } = await c.req.json();
-    
-    const user = users.find(u => u.username === username);
-    if (!user || !bcrypt.compareSync(password, user.password)) {
-      return c.json({ error: 'Credenciales inválidas' }, 401);
-    }
-
-    logAction(user.id, 'login_attempt', { success: true });
-    
-    // En producción, aquí deberías verificar si el usuario tiene MFA habilitado
-    const requiresMFA = true; // Simulamos que siempre requiere MFA
-    
-    return c.json({ 
-      message: 'Login exitoso',
-      user: { id: user.id, username: user.username, role: user.role },
-      requiresMFA,
-      tempToken: requiresMFA ? generateToken(user) : null
-    });
-  } catch (error) {
-    return c.json({ error: 'Error en el login' }, 500);
-  }
-});
-
-app.post('/api/auth/verify-mfa', async (c) => {
-  try {
-    const { code } = await c.req.json();
-    
-    // Simulación de verificación MFA
-    // En producción, usarías speakeasy o similar
-    if (code === '123456') { // Código de prueba
-      const user = users[0]; // Simulamos el usuario admin
-      const token = generateToken(user);
-      
-      logAction(user.id, 'mfa_verification', { success: true });
-      
-      return c.json({ 
-        message: 'MFA verificado',
-        token,
-        user: { id: user.id, username: user.username, role: user.role, name: 'Administrador' }
-      });
-    } else {
-      return c.json({ error: 'Código MFA inválido' }, 401);
-    }
-  } catch (error) {
-    return c.json({ error: 'Error en verificación MFA' }, 500);
-  }
-});
-
-// Rutas de documentos
-app.get('/api/documents', authMiddleware(), async (c) => {
-  try {
-    const user = c.get('user');
-    const userDocs = documents.filter(doc => {
-      // Lógica de permisos basada en roles y nivel de acceso
-      if (user.role === 'admin') return true;
-      if (doc.accessLevel === 'public') return true;
-      if (doc.accessLevel === 'internal') return ['admin', 'manager', 'user'].includes(user.role);
-      if (doc.accessLevel === 'confidential') return ['admin', 'manager'].includes(user.role);
-      if (doc.accessLevel === 'restricted') return user.role === 'admin';
-      return false;
-    });
-    
-    return c.json(userDocs);
-  } catch (error) {
-    return c.json({ error: 'Error al obtener documentos' }, 500);
-  }
-});
-
-app.post('/api/documents', authMiddleware(), async (c) => {
-  try {
-    const user = c.get('user');
-    const { title, accessLevel, file } = await c.req.json();
-    
-    // Cifrar el contenido del archivo
-    const encrypted = encryptData(file.data, ENCRYPTION_KEY);
-    
-    const document = {
-      id: documents.length + 1,
-      title,
-      accessLevel,
-      fileName: file.name,
-      fileType: file.type,
-      encryptedData: encrypted.encrypted,
-      authTag: encrypted.authTag,
-      ownerId: user.id,
-      createdAt: new Date().toISOString(),
-      verified: false
-    };
-    
-    documents.push(document);
-    logAction(user.id, 'document_upload', { documentId: document.id });
-    
-    return c.json({ message: 'Documento subido exitosamente', document });
-  } catch (error) {
-    return c.json({ error: 'Error al subir documento' }, 500);
-  }
-});
-
-app.post('/api/documents/:id/verify', authMiddleware(), async (c) => {
-  try {
-    const user = c.get('user');
-    const documentId = parseInt(c.req.param('id'));
-    
-    const document = documents.find(doc => doc.id === documentId);
-    if (!document) {
-      return c.json({ error: 'Documento no encontrado' }, 404);
-    }
-    
-    // Verificar permisos
-    if (!['admin', 'auditor'].includes(user.role) && document.ownerId !== user.id) {
-      return c.json({ error: 'No autorizado para verificar este documento' }, 403);
-    }
-    
-    // Verificar la integridad del documento
-    try {
-      const decrypted = decryptData(document.encryptedData, ENCRYPTION_KEY, document.authTag);
-      document.verified = true;
-      document.verifiedBy = user.id;
-      document.verifiedAt = new Date().toISOString();
-      
-      logAction(user.id, 'document_verification', { documentId, success: true });
-      
-      return c.json({ message: 'Documento verificado exitosamente', document });
-    } catch (error) {
-      logAction(user.id, 'document_verification', { documentId, success: false, error: error.message });
-      return c.json({ error: 'La verificación del documento falló - el documento puede estar corrupto' }, 400);
-    }
-  } catch (error) {
-    return c.json({ error: 'Error al verificar documento' }, 500);
-  }
-});
-
-// Rutas de auditoría
-app.get('/api/audit', authMiddleware(), roleMiddleware(['admin', 'auditor']), async (c) => {
-  try {
-    const user = c.get('user');
-    const limit = parseInt(c.req.query('limit')) || 50;
-    const offset = parseInt(c.req.query('offset')) || 0;
-    
-    // Filtrar logs según permisos
-    let logs = auditLogs;
-    if (user.role === 'auditor') {
-      logs = logs.filter(log => ['document_verification', 'document_access'].includes(log.action));
-    }
-    
-    const paginatedLogs = logs.slice(offset, offset + limit);
-    
-    return c.json({
-      logs: paginatedLogs,
-      total: logs.length,
-      offset,
-      limit
-    });
-  } catch (error) {
-    return c.json({ error: 'Error al obtener logs de auditoría' }, 500);
-  }
-});
+// Middleware global
+app.use('*', cors({
+  origin: ['http://localhost:3000', 'https://docusentinel-pro.netlify.app'],
+  credentials: true,
+  maxAge: 86400
+}));
 
 // Ruta de health check
-app.get('/api/health', async (c) => {
+app.get('/health', (c) => {
   return c.json({
     status: 'healthy',
-    timestamp: new Date().toISOString(),
     service: 'DocuSentinel Pro',
-    version: '1.0.0',
-    environment: 'netlify'
+    version: '2.0.0',
+    timestamp: new Date().toISOString()
   });
 });
 
-// Ruta de documentación
-app.get('/api/docs', async (c) => {
+// Documentación de la API
+app.get('/docs', (c) => {
   return c.json({
     name: 'DocuSentinel Pro API',
-    version: '1.0.0',
-    description: 'API de gestión documental con cifrado militar',
-    endpoints: [
-      { method: 'POST', path: '/api/auth/login', description: 'Iniciar sesión' },
-      { method: 'POST', path: '/api/auth/verify-mfa', description: 'Verificar código MFA' },
-      { method: 'GET', path: '/api/documents', description: 'Listar documentos' },
-      { method: 'POST', path: '/api/documents', description: 'Subir documento' },
-      { method: 'POST', path: '/api/documents/:id/verify', description: 'Verificar documento' },
-      { method: 'GET', path: '/api/audit', description: 'Obtener logs de auditoría' },
-      { method: 'GET', path: '/api/health', description: 'Health check' },
-      { method: 'GET', path: '/api/docs', description: 'Documentación de la API' }
-    ],
-    security: {
-      encryption: 'AES-256-GCM',
-      authentication: 'JWT con MFA',
-      authorization: 'RBAC',
-      audit: 'Blockchain inmutable'
+    version: '2.0.0',
+    description: 'API para gestión segura de documentos con verificación AI',
+    endpoints: {
+      auth: {
+        'POST /api/auth/register': 'Registrar nuevo usuario',
+        'POST /api/auth/login': 'Iniciar sesión',
+        'POST /api/auth/logout': 'Cerrar sesión',
+        'GET /api/auth/profile': 'Obtener perfil de usuario'
+      },
+      documents: {
+        'GET /api/documents': 'Listar documentos del usuario',
+        'POST /api/documents': 'Subir nuevo documento',
+        'GET /api/documents/:id': 'Obtener documento específico',
+        'DELETE /api/documents/:id': 'Eliminar documento'
+      },
+      verification: {
+        'POST /api/verification': 'Verificar autenticidad de documento',
+        'GET /api/verification/:id': 'Obtener resultado de verificación'
+      },
+      audit: {
+        'GET /api/audit/logs': 'Obtener logs de auditoría',
+        'GET /api/audit/export': 'Exportar reporte de auditoría'
+      }
     }
   });
 });
 
-// Handler para Netlify Functions
-exports.handler = async (event, context) => {
-  try {
-    // Adaptar el evento de Netlify al formato de Hono
-    const url = new URL(event.rawUrl || `https://${event.headers.host}${event.path}`);
-    
-    const request = new Request(url.toString(), {
-      method: event.httpMethod,
-      headers: event.headers,
-      body: event.body,
-    });
+// Montar rutas de API
+app.route('/api/auth', authRoutes);
+app.route('/api/documents', documentRoutes);
+app.route('/api/verification', verificationRoutes);
+app.route('/api/audit', auditRoutes);
 
-    // Procesar con Hono
-    const response = await app.fetch(request);
+// Ruta raíz - Servir la aplicación frontend
+app.get('/', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DocuSentinel Pro - Gestión Integral de Documentos</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/styles.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-900 text-white min-h-screen">
+        <!-- Header Futurista -->
+        <header class="bg-gradient-to-r from-gray-800 to-gray-900 border-b border-cyan-500 shadow-lg">
+            <div class="container mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-shield-alt text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                                DocuSentinel Pro
+                            </h1>
+                            <p class="text-gray-400 text-sm">Gestión Integral de Documentos - 2026</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button id="loginBtn" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors duration-200">
+                            <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
 
-    // Adaptar la respuesta de Hono al formato de Netlify
-    return {
-      statusCode: response.status,
-      headers: Object.fromEntries(response.headers.entries()),
-      body: await response.text(),
-    };
-  } catch (error) {
-    console.error('Netlify Function Error:', error);
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        error: 'Error interno del servidor',
-        message: error.message 
-      })
-    };
-  }
+        <!-- Hero Section -->
+        <section class="relative overflow-hidden bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,217,255,0.1),transparent_70%)]"></div>
+            <div class="container mx-auto px-6 py-20 relative z-10">
+                <div class="text-center max-w-4xl mx-auto">
+                    <h2 class="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                        Seguridad Documental del Futuro
+                    </h2>
+                    <p class="text-xl text-gray-300 mb-8 leading-relaxed">
+                        Protege, verifica y gestiona tus documentos con tecnología de encriptación avanzada y verificación AI
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button id="startBtn" class="px-8 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105">
+                            <i class="fas fa-rocket mr-2"></i>Comenzar Ahora
+                        </button>
+                        <button id="demoBtn" class="px-8 py-4 border-2 border-cyan-500 text-cyan-400 hover:bg-cyan-500 hover:text-white rounded-lg font-semibold transition-all duration-200">
+                            <i class="fas fa-play mr-2"></i>Ver Demo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Grid -->
+        <section class="py-20 bg-gray-800">
+            <div class="container mx-auto px-6">
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Encriptación -->
+                    <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 hover:border-cyan-500 transition-colors duration-200 group">
+                        <div class="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                            <i class="fas fa-lock text-white text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 text-cyan-400">Encriptación Avanzada</h3>
+                        <p class="text-gray-400">AES-256-GCM + RSA-4096 para máxima seguridad</p>
+                    </div>
+
+                    <!-- Verificación AI -->
+                    <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 hover:border-cyan-500 transition-colors duration-200 group">
+                        <div class="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                            <i class="fas fa-brain text-white text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 text-purple-400">Verificación AI</h3>
+                        <p class="text-gray-400">Detección inteligente de manipulación y falsificación</p>
+                    </div>
+
+                    <!-- Auditoría -->
+                    <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 hover:border-cyan-500 transition-colors duration-200 group">
+                        <div class="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                            <i class="fas fa-clipboard-check text-white text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 text-orange-400">Auditoría Forense</h3>
+                        <p class="text-gray-400">Registro completo e inmutable de todas las operaciones</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="bg-gray-900 border-t border-gray-700 py-8">
+            <div class="container mx-auto px-6 text-center">
+                <p class="text-gray-400">
+                    © 2026 DocuSentinel Pro. Todos los derechos reservados. 
+                    <span class="text-cyan-400">Seguridad de nivel empresarial</span>
+                </p>
+            </div>
+        </footer>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="/static/app.js"></script>
+    </body>
+    </html>
+  `);
+});
+
+// Manejo de errores
+app.onError((err, c) => {
+  console.error('Error:', err);
+  return c.json({
+    error: 'Internal server error',
+    message: err.message
+  }, 500);
+});
+
+// Exportar para Netlify Functions
+module.exports.handler = async (event, context) => {
+  const url = new URL(event.path, 'https://' + event.headers.host);
+  const request = new Request(url.toString(), {
+    method: event.httpMethod,
+    headers: event.headers,
+    body: event.body
+  });
+
+  const response = await app.fetch(request, {}, {});
+  
+  return {
+    statusCode: response.status,
+    headers: Object.fromEntries(response.headers.entries()),
+    body: await response.text()
+  };
 };

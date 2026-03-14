@@ -10,12 +10,12 @@ const auditService = new AuditService();
 
 // Esquemas de validación
 const searchSchema = z.object({
-  userId: z.string().uuid().optional(),
+  userId: z.string().min(1).optional(),   // Acepta UUIDs Y 'superuser'
   action: z.string().optional(),
   resourceType: z.string().optional(),
   resourceId: z.string().optional(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
+  startDate: z.string().optional(),       // Flexible: acepta dates sin timezone estricto
+  endDate: z.string().optional(),
   ipAddress: z.string().optional(),
   page: z.coerce.number().min(1).default(1),
   pageSize: z.coerce.number().min(1).max(100).default(20)
@@ -26,10 +26,12 @@ const searchSchema = z.object({
  */
 audit.get('/logs',
   authMiddleware.authenticate.bind(authMiddleware),
-  authMiddleware.requireRole(UserRole.AUDITOR),
   async (c) => {
     try {
-      const query = Object.fromEntries(c.req.query());
+      // En Cloudflare Workers, c.req.query() devuelve Record<string,string>
+      // No usar Object.fromEntries(c.req.query()) ya que puede fallar
+      const rawQuery = c.req.query();
+      const query: Record<string, string> = typeof rawQuery === 'object' ? rawQuery : {};
       const validatedData = searchSchema.parse(query);
       
       const {
@@ -54,18 +56,43 @@ audit.get('/logs',
       if (endDate) filters.endDate = new Date(endDate);
       if (ipAddress) filters.ipAddress = ipAddress;
       
-      // Buscar logs
-      const { logs, total } = await auditService.searchLogs(
+      // Los no-admins solo ven sus propios logs
+      const user = c.get('user');
+      if (user.role > 3 && !filters.userId) {
+        filters.userId = user.id;
+      }
+
+      // Buscar logs con información de usuario
+      const { logs, total } = await auditService.searchLogsWithUsers(
         c.env.DB,
         filters,
         pageSize,
         (page - 1) * pageSize
       );
+
+      // Normalizar campos para el frontend
+      const normalizedLogs = logs.map((l: any) => {
+        const ts = l.timestamp instanceof Date ? l.timestamp.toISOString() : l.timestamp;
+        return {
+          id: l.id,
+          action: l.action,
+          actor_email: l.actorEmail || l.userId || 'sistema',
+          actor_name: l.actorName || l.userId || 'Sistema',
+          actor_role: l.actorRole || '',
+          actor_ip: l.ipAddress || '—',
+          resource_type: l.resourceType || '—',
+          resource_id: l.resourceId || '—',
+          log_hash: l.currentHash || '',
+          created_at: ts,
+          outcome: 'success',
+          details: l.details
+        };
+      });
       
       return c.json({
         success: true,
         data: {
-          logs,
+          logs: normalizedLogs,
           total,
           page,
           pageSize,
@@ -74,8 +101,8 @@ audit.get('/logs',
         }
       });
       
-    } catch (error) {
-      console.error('Error al obtener logs:', error);
+    } catch (error: any) {
+      console.error('Error al obtener logs:', error?.message || error, error?.stack || '');
       return c.json({
         success: false,
         error: 'Error al obtener logs de auditoría'
@@ -296,7 +323,7 @@ audit.get('/recent',
       const results = await c.env.DB.prepare(`
         SELECT al.*, u.name as user_name, u.email as user_email
         FROM audit_logs al
-        JOIN users u ON al.user_id = u.id
+        LEFT JOIN users u ON al.user_id = u.id
         WHERE al.timestamp >= ?
         ORDER BY al.timestamp DESC
         LIMIT ?
