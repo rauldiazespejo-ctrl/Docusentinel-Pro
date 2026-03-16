@@ -270,6 +270,51 @@ auth.post('/change-password', authMiddleware.authenticate.bind(authMiddleware), 
   }
 });
 
+// ─── PUT /profile ─────────────────────────────────────────────────
+auth.put('/profile', authMiddleware.authenticate.bind(authMiddleware), async (c) => {
+  try {
+    const user = c.get('user');
+    const ip = getIP(c); const ua = getUA(c);
+    const { name } = await c.req.json();
+    if (!name || name.trim().length < 2) return c.json({ success:false, error:'Nombre inválido' }, 400);
+
+    await c.env.DB.prepare(`UPDATE users SET name=?, updated_at=? WHERE id=?`)
+      .bind(name.trim(), new Date().toISOString(), user.id).run();
+
+    await auditService.logEvent(user.id,'PROFILE_UPDATED','user',user.id,{ name },ip,ua,c.env.DB);
+    return c.json({ success:true, message:'Perfil actualizado', data:{ name: name.trim() } });
+  } catch (err) {
+    return c.json({ success:false, error:'Error al actualizar perfil' }, 500);
+  }
+});
+
+// ─── DELETE /users/:id (admin) ─────────────────────────────────────
+auth.delete('/users/:id', authMiddleware.authenticate.bind(authMiddleware), async (c) => {
+  try {
+    const actor = c.get('user');
+    if (actor.role > 2) return c.json({ success: false, error: 'Permisos insuficientes' }, 403);
+    const userId = c.req.param('id');
+    if (userId === actor.id) return c.json({ success: false, error: 'No puedes eliminarte a ti mismo' }, 400);
+    const ip = getIP(c); const ua = getUA(c);
+
+    const target = await c.env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(userId).first();
+    if (!target) return c.json({ success: false, error: 'Usuario no encontrado' }, 404);
+
+    // Eliminar sesiones del usuario
+    await c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
+    // Desactivar (no borrar para mantener integridad del audit)
+    await c.env.DB.prepare('UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?')
+      .bind(new Date().toISOString(), userId).run();
+
+    await auditService.logEvent(actor.id, 'USER_DELETED', 'user', userId,
+      { email: target.email }, ip, ua, c.env.DB);
+
+    return c.json({ success: true, message: 'Usuario desactivado correctamente' });
+  } catch (err) {
+    return c.json({ success: false, error: 'Error al eliminar usuario' }, 500);
+  }
+});
+
 // ─── GET /users (admin) ───────────────────────────────────────────
 auth.get('/users', authMiddleware.authenticate.bind(authMiddleware), async (c) => {
   try {

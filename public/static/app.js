@@ -180,6 +180,11 @@ function renderApp() {
           <span class="nav-badge danger" id="badge-audit">—</span>
         </a>
         <div class="nav-divider"></div>
+        <div class="sidebar-section-label">Análisis</div>
+        <a class="nav-item" data-view="reports">
+          <span class="nav-icon"><i class="fas fa-chart-bar"></i></span> Reportes
+        </a>
+        <div class="nav-divider"></div>
         <div class="sidebar-section-label">Sistema</div>
         <a class="nav-item" data-view="settings">
           <span class="nav-icon"><i class="fas fa-cog"></i></span> Configuración
@@ -233,13 +238,14 @@ function renderApp() {
     el.addEventListener('click', (e) => { e.preventDefault(); navigate(el.dataset.view); });
   });
   document.getElementById('logout-btn').addEventListener('click', doLogout);
-  document.getElementById('user-menu-btn').addEventListener('click', doLogout);
+  document.getElementById('user-menu-btn').addEventListener('click', () => navigate('profile'));
   document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('open');
   });
 
   navigate('dashboard');
   loadBadges();
+  setupGlobalSearch();
 }
 
 function roleLabel(r) {
@@ -282,6 +288,8 @@ async function renderView() {
     case 'audit':          return await renderAudit();
     case 'users':          return await renderUsers();
     case 'settings':       return renderSettings();
+    case 'reports':        return await renderReports();
+    case 'profile':        return renderProfile();
     default:               return await renderDashboard();
   }
 }
@@ -1218,8 +1226,24 @@ function filterAuditLogs() {
     row.style.display = (!filter || text.includes(filter)) ? '' : 'none';
   });
 }
-function exportAudit() {
+async function exportAudit() {
   toast('info','Exportando…','Preparando archivo CSV del audit trail.');
+  try {
+    const response = await fetch(API + '/audit/export?format=csv', {
+      headers: { 'Authorization': `Bearer ${State.token}` }
+    });
+    if (!response.ok) { toast('error','Error','No se pudo exportar.'); return; }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit_trail_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('success','Exportado','CSV descargado correctamente.');
+  } catch(e) {
+    toast('error','Error','No se pudo exportar el audit trail.');
+  }
 }
 
 // ─── SETTINGS ────────────────────────────────────────────────────
@@ -1228,7 +1252,7 @@ function renderSettings() {
   const u = State.user;
   document.getElementById('view-content').innerHTML = `
   <div class="page-header">
-    <div class="page-header-left"><h1>Configuración de la Cuenta</h1><p>Gestiona tu perfil, seguridad y preferencias.</p></div>
+    <div class="page-header-left"><h1>Configuración de la Cuenta</h1><p>Gestiona tu perfil, seguridad y preferencias del sistema.</p></div>
   </div>
 
   <div class="grid-2">
@@ -1252,7 +1276,7 @@ function renderSettings() {
             <label class="form-label">Correo electrónico</label>
             <input class="form-input" type="email" value="${u.email}" disabled>
           </div>
-          <button class="btn btn-primary" onclick="toast('success','Perfil actualizado','Los cambios han sido guardados.')"><i class="fas fa-save"></i> Guardar Cambios</button>
+          <button class="btn btn-primary" onclick="saveProfileName()"><i class="fas fa-save"></i> Guardar Cambios</button>
         </div>
       </div>
 
@@ -1273,7 +1297,7 @@ function renderSettings() {
               <input class="form-input" type="password" id="s-pass-new" placeholder="Mínimo 8 caracteres">
             </div>
           </div>
-          <button class="btn btn-secondary" onclick="toast('success','Contraseña actualizada','Tu contraseña ha sido cambiada exitosamente.')"><i class="fas fa-key"></i> Actualizar Contraseña</button>
+          <button class="btn btn-secondary" onclick="doChangePassword()"><i class="fas fa-key"></i> Actualizar Contraseña</button>
         </div>
       </div>
     </div>
@@ -1771,6 +1795,9 @@ async function renderUsers(page = 1, search = '') {
                   onclick="toggleUserStatus('${u.id}',${u.isActive})" title="${u.isActive ? 'Desactivar' : 'Activar'}">
                   <i class="fas fa-${u.isActive ? 'ban' : 'check'}"></i>
                 </button>
+                <button class="btn btn-ghost btn-sm text-danger" onclick="deleteUserConfirm('${u.id}','${u.name}')" title="Eliminar usuario">
+                  <i class="fas fa-trash"></i>
+                </button>
               </div>
             </td>
           </tr>`).join('')}
@@ -1898,6 +1925,385 @@ async function createNewUser() {
   }
 }
 
+function deleteUserConfirm(userId, userName) {
+  showModal('modal-del-user', `
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-exclamation-triangle" style="color:#ef4444"></i> Desactivar Usuario</div>
+      <button class="modal-close" onclick="closeModal('modal-del-user')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:12px">¿Deseas desactivar al usuario <strong>${userName}</strong>?</p>
+      <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:12px;font-size:13px;color:#ef4444">
+        <i class="fas fa-info-circle"></i> El usuario no podrá iniciar sesión pero sus registros de auditoría se conservarán.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-del-user')">Cancelar</button>
+      <button class="btn btn-danger" onclick="deleteUserAction('${userId}')"><i class="fas fa-ban"></i> Desactivar</button>
+    </div>`);
+}
+
+async function deleteUserAction(userId) {
+  closeModal('modal-del-user');
+  const res = await req('DELETE', `/auth/users/${userId}`);
+  if (res.ok && res.data.success) {
+    toast('success', 'Usuario desactivado', 'El usuario ha sido desactivado correctamente.');
+    renderUsers();
+  } else {
+    toast('error', 'Error', res.data?.error || 'No se pudo desactivar el usuario.');
+  }
+}
+
+// ─── Guardar nombre de perfil ─────────────────────────────────────
+async function saveProfileName() {
+  const name = document.getElementById('s-name')?.value?.trim();
+  if (!name || name.length < 2) { toast('warning','Nombre inválido','El nombre debe tener al menos 2 caracteres.'); return; }
+  const res = await put('/auth/profile', { name });
+  if (res.ok && res.data.success) {
+    State.user.name = name;
+    localStorage.setItem('ds_user', JSON.stringify(State.user));
+    toast('success','Perfil actualizado','Nombre guardado correctamente.');
+    // Actualizar avatar en sidebar
+    const avatar = document.querySelector('.user-avatar');
+    if (avatar) avatar.textContent = avatarText(name);
+    const uname = document.querySelector('.user-name');
+    if (uname) uname.textContent = name;
+  } else {
+    toast('error','Error', res.data?.error || 'No se pudo actualizar el perfil.');
+  }
+}
+
+// ─── Cambiar contraseña funcional ─────────────────────────────────
+async function doChangePassword() {
+  const cur = document.getElementById('s-pass-cur')?.value;
+  const nw  = document.getElementById('s-pass-new')?.value;
+  if (!cur || !nw) { toast('warning','Campos requeridos','Completa ambos campos de contraseña.'); return; }
+  if (nw.length < 8) { toast('warning','Contraseña corta','La nueva contraseña debe tener al menos 8 caracteres.'); return; }
+  const res = await post('/auth/change-password', { currentPassword: cur, newPassword: nw });
+  if (res.ok && res.data.success) {
+    toast('success','Contraseña actualizada','Tu contraseña fue cambiada exitosamente.');
+    document.getElementById('s-pass-cur').value = '';
+    document.getElementById('s-pass-new').value = '';
+  } else {
+    toast('error','Error', res.data?.error || 'No se pudo cambiar la contraseña.');
+  }
+}
+
+// ─── Exportar documentos CSV ──────────────────────────────────────
+async function exportDocsCSV() {
+  toast('info','Exportando…','Preparando CSV de documentos.');
+  try {
+    const response = await fetch(API + '/documents/export/csv', {
+      headers: { 'Authorization': `Bearer ${State.token}` }
+    });
+    if (!response.ok) { toast('error','Error','No se pudo exportar.'); return; }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `documentos_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('success','Exportado','CSV de documentos descargado.');
+  } catch(e) { toast('error','Error','No se pudo exportar los documentos.'); }
+}
+
+// ─── Vista Perfil ─────────────────────────────────────────────────
+function renderProfile() {
+  setView('Mi Perfil');
+  const u = State.user;
+  document.getElementById('view-content').innerHTML = `
+  <div class="page-header">
+    <div class="page-header-left"><h1>Mi Perfil</h1><p>Gestiona tu información personal y seguridad.</p></div>
+    <button class="btn btn-secondary" onclick="navigate('settings')"><i class="fas fa-cog"></i> Configuración</button>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <div class="card mb-5">
+        <div class="card-body" style="text-align:center;padding:32px">
+          <div class="user-avatar" style="width:80px;height:80px;font-size:28px;margin:0 auto 16px">${avatarText(u.name)}</div>
+          <div class="fw-700" style="font-size:20px;margin-bottom:4px">${u.name || '—'}</div>
+          <div class="text-secondary text-sm">${u.email}</div>
+          <div style="margin-top:10px"><span class="badge badge-info">${roleLabel(u.role)}</span></div>
+          ${u.mfaEnabled ? `<div style="margin-top:8px"><span class="badge badge-success"><i class="fas fa-shield-alt"></i> MFA Activo</span></div>` : `<div style="margin-top:8px"><span class="badge badge-warning"><i class="fas fa-exclamation-triangle"></i> MFA Inactivo</span></div>`}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><i class="fas fa-user-edit"></i> Editar Perfil</div></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Nombre completo</label>
+            <div class="input-group">
+              <i class="fas fa-user input-icon"></i>
+              <input class="form-input" type="text" id="p-name" value="${u.name || ''}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <div class="input-group">
+              <i class="fas fa-envelope input-icon"></i>
+              <input class="form-input" type="email" value="${u.email}" disabled style="opacity:.6">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="saveProfileFromProfile()"><i class="fas fa-save"></i> Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card mb-5">
+        <div class="card-header"><div class="card-title"><i class="fas fa-lock"></i> Cambiar Contraseña</div></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Contraseña actual</label>
+            <div class="input-group">
+              <i class="fas fa-lock input-icon"></i>
+              <input class="form-input" type="password" id="p-cur" placeholder="••••••••">
+              <i class="fas fa-eye input-action" onclick="togglePass('p-cur',this)"></i>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nueva contraseña</label>
+            <div class="input-group">
+              <i class="fas fa-lock input-icon"></i>
+              <input class="form-input" type="password" id="p-new" placeholder="Mínimo 8 caracteres">
+              <i class="fas fa-eye input-action" onclick="togglePass('p-new',this)"></i>
+            </div>
+          </div>
+          <button class="btn btn-secondary" onclick="doChangePwdProfile()"><i class="fas fa-key"></i> Actualizar Contraseña</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><i class="fas fa-shield-alt"></i> Autenticación de 2 Factores</div></div>
+        <div class="card-body">
+          ${u.mfaEnabled ? `
+          <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:16px;text-align:center;margin-bottom:16px">
+            <i class="fas fa-check-circle" style="color:var(--green-400);font-size:24px;margin-bottom:8px;display:block"></i>
+            <div class="fw-600">MFA Activado y Seguro</div>
+            <div class="text-xs text-muted mt-2">Tu cuenta está protegida con TOTP</div>
+          </div>` : `
+          <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:16px;text-align:center;margin-bottom:16px">
+            <i class="fas fa-exclamation-triangle" style="color:var(--amber-400);font-size:24px;margin-bottom:8px;display:block"></i>
+            <div class="fw-600">MFA No Activado</div>
+            <div class="text-xs text-muted mt-2">Se recomienda activar MFA para mayor seguridad</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="navigate('settings')"><i class="fas fa-shield-alt"></i> Activar MFA</button>`}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function saveProfileFromProfile() {
+  const name = document.getElementById('p-name')?.value?.trim();
+  if (!name || name.length < 2) { toast('warning','Nombre inválido','El nombre debe tener al menos 2 caracteres.'); return; }
+  const res = await put('/auth/profile', { name });
+  if (res.ok && res.data.success) {
+    State.user.name = name;
+    localStorage.setItem('ds_user', JSON.stringify(State.user));
+    toast('success','Perfil actualizado','Los cambios han sido guardados.');
+    const avatar = document.querySelector('.user-avatar');
+    if (avatar) avatar.textContent = avatarText(name);
+    const uname = document.querySelector('.user-name');
+    if (uname) uname.textContent = name;
+  } else {
+    toast('error','Error', res.data?.error || 'No se pudo actualizar.');
+  }
+}
+
+async function doChangePwdProfile() {
+  const cur = document.getElementById('p-cur')?.value;
+  const nw  = document.getElementById('p-new')?.value;
+  if (!cur || !nw) { toast('warning','Campos requeridos','Completa ambos campos.'); return; }
+  if (nw.length < 8) { toast('warning','Contraseña corta','Mínimo 8 caracteres.'); return; }
+  const res = await post('/auth/change-password', { currentPassword: cur, newPassword: nw });
+  if (res.ok && res.data.success) {
+    toast('success','Contraseña actualizada','Tu contraseña fue cambiada exitosamente.');
+    document.getElementById('p-cur').value = '';
+    document.getElementById('p-new').value = '';
+  } else {
+    toast('error','Error', res.data?.error || 'No se pudo cambiar la contraseña.');
+  }
+}
+
+// ─── Vista Reportes ───────────────────────────────────────────────
+async function renderReports() {
+  setView('Reportes y Estadísticas');
+  const el = document.getElementById('view-content');
+  el.innerHTML = `<div class="empty-state"><i class="fas fa-spinner fa-spin" style="font-size:28px;color:var(--cyan-500)"></i><h3>Cargando reportes…</h3></div>`;
+
+  const [statsRes, advRes, auditRes] = await Promise.all([
+    get('/documents/stats'),
+    get('/documents/stats/advanced'),
+    get('/audit/logs?pageSize=5')
+  ]);
+
+  const stats = statsRes.ok ? statsRes.data.data : {};
+  const adv = advRes.ok ? advRes.data.data : { byType:[], byLevel:[], byDay:[], totalSize:0 };
+  const audit = auditRes.ok ? auditRes.data.data : { total:0 };
+
+  // Calcular tendencia de días
+  const days = adv.byDay || [];
+  const daysLabels = days.map(d => d.day?.slice(5) || '');
+  const daysCounts = days.map(d => d.count || 0);
+
+  el.innerHTML = `
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1>Reportes del Sistema</h1>
+      <p>Estadísticas completas de uso, seguridad y actividad documental</p>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secondary" onclick="exportDocsCSV()"><i class="fas fa-file-csv"></i> Exportar Docs CSV</button>
+      <button class="btn btn-secondary" onclick="exportAudit()"><i class="fas fa-file-csv"></i> Exportar Audit CSV</button>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="stats-grid">
+    <div class="stat-card cyan">
+      <div class="stat-header"><div class="stat-label">Total Documentos</div><div class="stat-icon cyan"><i class="fas fa-vault"></i></div></div>
+      <div class="stat-value">${adv.totalDocs || stats.totalDocuments || 0}</div>
+      <div class="stat-change"><i class="fas fa-hdd"></i> ${fmtSize(adv.totalSize || 0)} almacenados</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-header"><div class="stat-label">Verificaciones</div><div class="stat-icon green"><i class="fas fa-check-circle"></i></div></div>
+      <div class="stat-value">${stats.totalVerifications || 0}</div>
+      <div class="stat-change"><i class="fas fa-shield-alt"></i> Análisis forenses</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-header"><div class="stat-label">Eventos de Auditoría</div><div class="stat-icon amber"><i class="fas fa-scroll"></i></div></div>
+      <div class="stat-value">${stats.totalAuditEvents || audit.total || 0}</div>
+      <div class="stat-change"><i class="fas fa-history"></i> Registros inmutables</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-header"><div class="stat-label">Tasa de Autenticidad</div><div class="stat-icon purple"><i class="fas fa-percentage"></i></div></div>
+      <div class="stat-value">${stats.totalVerifications > 0 ? Math.round(((stats.verificationsByStatus?.authentic||0)/stats.totalVerifications)*100) : 100}%</div>
+      <div class="stat-change"><i class="fas fa-award"></i> Documentos auténticos</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Documentos por tipo -->
+    <div class="card">
+      <div class="card-header"><div class="card-title"><i class="fas fa-chart-pie"></i> Documentos por Tipo</div></div>
+      <div class="card-body">
+        ${adv.byType?.length === 0 ? `<div class="empty-state" style="padding:40px"><i class="fas fa-folder-open"></i><h3>Sin datos</h3></div>` :
+        adv.byType?.map(t => {
+          const total = adv.byType.reduce((s,x) => s+x.count, 0);
+          const pct = total > 0 ? Math.round(t.count/total*100) : 0;
+          return `
+          <div style="margin-bottom:14px">
+            <div class="progress-label">
+              <span class="text-sm">${t.type?.split('/')[1]?.toUpperCase() || t.type || '—'}</span>
+              <span class="text-mono text-xs">${t.count} (${pct}%)</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill cyan" style="width:${pct}%"></div></div>
+          </div>`}).join('')}
+      </div>
+    </div>
+
+    <!-- Documentos por nivel de seguridad -->
+    <div class="card">
+      <div class="card-header"><div class="card-title"><i class="fas fa-shield-halved"></i> Por Nivel de Seguridad</div></div>
+      <div class="card-body">
+        ${adv.byLevel?.length === 0 ? `<div class="empty-state" style="padding:40px"><i class="fas fa-folder-open"></i><h3>Sin datos</h3></div>` :
+        adv.byLevel?.map(l => {
+          const total = adv.byLevel.reduce((s,x) => s+x.count, 0);
+          const pct = total > 0 ? Math.round(l.count/total*100) : 0;
+          const colors = { public:'green', internal:'cyan', confidential:'amber', secret:'red' };
+          const color = colors[l.level] || 'cyan';
+          return `
+          <div style="margin-bottom:14px">
+            <div class="progress-label">
+              <span class="text-sm">${l.level?.charAt(0).toUpperCase()+l.level?.slice(1) || '—'}</span>
+              <span class="text-mono text-xs">${l.count} (${pct}%)</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill ${color}" style="width:${pct}%"></div></div>
+          </div>`}).join('')}
+      </div>
+    </div>
+  </div>
+
+  <!-- Actividad últimos 30 días -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-header">
+      <div class="card-title"><i class="fas fa-chart-line"></i> Actividad — Últimos 30 Días</div>
+    </div>
+    <div class="card-body">
+      ${days.length === 0 ? `
+        <div class="empty-state" style="padding:40px"><i class="fas fa-chart-line"></i><h3>Sin actividad reciente</h3><p>Comienza subiendo documentos para ver estadísticas.</p></div>
+      ` : `
+        <div style="overflow-x:auto">
+          <div style="display:flex;align-items:flex-end;gap:6px;height:120px;padding:0 4px">
+            ${days.map(d => {
+              const max = Math.max(...days.map(x=>x.count), 1);
+              const h = Math.round((d.count/max)*100);
+              return `
+              <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:20px" title="${d.day}: ${d.count} docs">
+                <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">${d.count}</div>
+                <div style="width:100%;background:rgba(0,180,216,.7);border-radius:3px 3px 0 0;height:${h}%;min-height:4px;transition:.3s"></div>
+                <div style="font-size:9px;color:var(--text-muted);margin-top:4px;writing-mode:vertical-rl;transform:rotate(180deg)">${d.day?.slice(5)||''}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `}
+    </div>
+  </div>
+
+  <!-- Verificaciones por estado -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-header"><div class="card-title"><i class="fas fa-microscope"></i> Resultados de Verificaciones Forenses</div></div>
+    <div class="card-body">
+      <div class="grid-3">
+        ${['authentic','suspicious','fraudulent'].map(status => {
+          const cfg = {
+            authentic:  { label:'Auténticos',   color:'green', icon:'fa-check-circle' },
+            suspicious: { label:'Sospechosos',   color:'amber', icon:'fa-exclamation-triangle' },
+            fraudulent: { label:'Fraudulentos',  color:'red',   icon:'fa-times-circle' }
+          }[status];
+          const count = adv.verifByStatus?.find(v=>v.status===status)?.count ||
+                        (stats.verificationsByStatus || {})[status] || 0;
+          return `
+          <div style="text-align:center;padding:20px;background:var(--bg-raised);border-radius:10px;border:1px solid var(--bg-border)">
+            <i class="fas ${cfg.icon}" style="font-size:28px;color:var(--${cfg.color}-400);margin-bottom:10px;display:block"></i>
+            <div style="font-size:28px;font-weight:700;color:var(--${cfg.color}-400)">${count}</div>
+            <div class="text-sm text-secondary">${cfg.label}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── Búsqueda global ──────────────────────────────────────────────
+function setupGlobalSearch() {
+  const input = document.getElementById('global-search');
+  if (!input) return;
+  let timeout;
+  input.addEventListener('input', () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(async () => {
+      const q = input.value.trim();
+      if (q.length < 2) return;
+      navigate('vault');
+      setTimeout(() => {
+        const sv = document.getElementById('vault-search');
+        if (sv) { sv.value = q; renderVault(1, q); }
+      }, 100);
+    }, 400);
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const q = input.value.trim();
+      if (q) { navigate('vault'); setTimeout(() => { const sv = document.getElementById('vault-search'); if (sv) { sv.value = q; renderVault(1, q); } }, 100); }
+    }
+  });
+}
+
 // ─── Modal helpers ────────────────────────────────────────────────
 function showModal(id, content) {
   let overlay = document.getElementById(id);
@@ -1954,6 +2360,15 @@ window.editUserModal   = editUserModal;
 window.saveUserEdit    = saveUserEdit;
 window.showRegisterModal = showRegisterModal;
 window.createNewUser   = createNewUser;
+// Nuevas funciones de software
+window.deleteUserConfirm = deleteUserConfirm;
+window.deleteUserAction  = deleteUserAction;
+window.renderProfile   = renderProfile;
+window.saveProfileName = saveProfileName;
+window.saveProfileFromProfile = saveProfileFromProfile;
+window.doChangePassword= doChangePassword;
+window.doChangePwdProfile = doChangePwdProfile;
+window.exportDocsCSV   = exportDocsCSV;
 
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {

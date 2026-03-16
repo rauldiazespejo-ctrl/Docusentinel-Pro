@@ -388,6 +388,92 @@ documents.delete('/:id', authMiddleware.authenticate.bind(authMiddleware), async
   }
 });
 
+// ─── GET /export/csv ──────────────────────────────────────────────
+documents.get('/export/csv', authMiddleware.authenticate.bind(authMiddleware), async (c) => {
+  try {
+    const user = c.get('user');
+    const now = new Date().toISOString();
+
+    const results = await c.env.DB.prepare(`
+      SELECT d.id, d.name, d.type, d.size, d.hash, d.security_level, d.created_at,
+             COUNT(DISTINCT v.id) as verification_count
+      FROM documents d
+      LEFT JOIN verifications v ON d.id = v.document_id
+      WHERE d.created_by = ?
+         OR d.id IN (SELECT document_id FROM permissions WHERE user_id = ? AND (expires_at IS NULL OR expires_at > ?))
+      GROUP BY d.id
+      ORDER BY d.created_at DESC
+    `).bind(user.id, user.id, now).all();
+
+    const rows = results.results as any[];
+    const lines = ['ID,Nombre,Tipo,Tamaño (bytes),Hash SHA-3,Nivel de Seguridad,Verificaciones,Fecha de Creación'];
+    for (const r of rows) {
+      lines.push([r.id, r.name, r.type, r.size, r.hash || '', r.security_level, r.verification_count, r.created_at]
+        .map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
+    }
+
+    return new Response(lines.join('\n'), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="documentos_${new Date().toISOString().split('T')[0]}.csv"`
+      }
+    });
+  } catch (err) {
+    console.error('Export CSV error:', err);
+    return c.json({ success: false, error: 'Error al exportar' }, 500);
+  }
+});
+
+// ─── GET /stats/advanced ──────────────────────────────────────────
+documents.get('/stats/advanced', authMiddleware.authenticate.bind(authMiddleware), async (c) => {
+  try {
+    const user = c.get('user');
+    const now = new Date().toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30*24*3600*1000).toISOString();
+
+    // Documentos por tipo
+    const byType = await c.env.DB.prepare(`
+      SELECT type, COUNT(*) as count FROM documents
+      WHERE created_by = ? GROUP BY type ORDER BY count DESC LIMIT 10
+    `).bind(user.id).all();
+
+    // Documentos por nivel de seguridad
+    const byLevel = await c.env.DB.prepare(`
+      SELECT security_level, COUNT(*) as count FROM documents
+      WHERE created_by = ? GROUP BY security_level
+    `).bind(user.id).all();
+
+    // Subidas en los últimos 30 días (por día)
+    const byDay = await c.env.DB.prepare(`
+      SELECT DATE(created_at) as day, COUNT(*) as count FROM documents
+      WHERE created_by = ? AND created_at >= ?
+      GROUP BY DATE(created_at) ORDER BY day ASC
+    `).bind(user.id, thirtyDaysAgo).all();
+
+    // Total tamaño
+    const sizeRow = await c.env.DB.prepare(`
+      SELECT SUM(size) as total_size, COUNT(*) as total FROM documents WHERE created_by = ?
+    `).bind(user.id).first();
+
+    // Verificaciones por estado
+    const verifByStatus = await c.env.DB.prepare(`
+      SELECT status, COUNT(*) as count FROM verifications GROUP BY status
+    `).all();
+
+    return c.json({ success: true, data: {
+      byType: (byType.results as any[]).map(r => ({ type: r.type, count: r.count })),
+      byLevel: (byLevel.results as any[]).map(r => ({ level: r.security_level, count: r.count })),
+      byDay: (byDay.results as any[]).map(r => ({ day: r.day, count: r.count })),
+      totalSize: (sizeRow?.total_size as number) || 0,
+      totalDocs: (sizeRow?.total as number) || 0,
+      verifByStatus: (verifByStatus.results as any[]).map(r => ({ status: r.status, count: r.count }))
+    }});
+  } catch (err) {
+    console.error('Advanced stats error:', err);
+    return c.json({ success: false, error: 'Error al obtener estadísticas' }, 500);
+  }
+});
+
 // ─── POST /:id/permissions ─────────────────────────────────────────
 documents.post('/:id/permissions', authMiddleware.authenticate.bind(authMiddleware), async (c) => {
   try {

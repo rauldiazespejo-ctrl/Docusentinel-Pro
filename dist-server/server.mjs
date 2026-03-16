@@ -8291,6 +8291,47 @@ auth.post("/change-password", authMiddleware.authenticate.bind(authMiddleware), 
     return c.json({ success: false, error: "Error al cambiar contrase\xF1a" }, 500);
   }
 });
+auth.put("/profile", authMiddleware.authenticate.bind(authMiddleware), async (c) => {
+  try {
+    const user = c.get("user");
+    const ip = getIP(c);
+    const ua = getUA(c);
+    const { name } = await c.req.json();
+    if (!name || name.trim().length < 2) return c.json({ success: false, error: "Nombre inv\xE1lido" }, 400);
+    await c.env.DB.prepare(`UPDATE users SET name=?, updated_at=? WHERE id=?`).bind(name.trim(), (/* @__PURE__ */ new Date()).toISOString(), user.id).run();
+    await auditService.logEvent(user.id, "PROFILE_UPDATED", "user", user.id, { name }, ip, ua, c.env.DB);
+    return c.json({ success: true, message: "Perfil actualizado", data: { name: name.trim() } });
+  } catch (err) {
+    return c.json({ success: false, error: "Error al actualizar perfil" }, 500);
+  }
+});
+auth.delete("/users/:id", authMiddleware.authenticate.bind(authMiddleware), async (c) => {
+  try {
+    const actor = c.get("user");
+    if (actor.role > 2) return c.json({ success: false, error: "Permisos insuficientes" }, 403);
+    const userId = c.req.param("id");
+    if (userId === actor.id) return c.json({ success: false, error: "No puedes eliminarte a ti mismo" }, 400);
+    const ip = getIP(c);
+    const ua = getUA(c);
+    const target = await c.env.DB.prepare("SELECT id, email FROM users WHERE id = ?").bind(userId).first();
+    if (!target) return c.json({ success: false, error: "Usuario no encontrado" }, 404);
+    await c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId).run();
+    await c.env.DB.prepare("UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?").bind((/* @__PURE__ */ new Date()).toISOString(), userId).run();
+    await auditService.logEvent(
+      actor.id,
+      "USER_DELETED",
+      "user",
+      userId,
+      { email: target.email },
+      ip,
+      ua,
+      c.env.DB
+    );
+    return c.json({ success: true, message: "Usuario desactivado correctamente" });
+  } catch (err) {
+    return c.json({ success: false, error: "Error al eliminar usuario" }, 500);
+  }
+});
 auth.get("/users", authMiddleware.authenticate.bind(authMiddleware), async (c) => {
   try {
     const user = c.get("user");
@@ -8735,6 +8776,73 @@ documents.delete("/:id", authMiddleware2.authenticate.bind(authMiddleware2), asy
   } catch (err) {
     console.error("Delete doc error:", err);
     return c.json({ success: false, error: "Error al eliminar documento" }, 500);
+  }
+});
+documents.get("/export/csv", authMiddleware2.authenticate.bind(authMiddleware2), async (c) => {
+  try {
+    const user = c.get("user");
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const results = await c.env.DB.prepare(`
+      SELECT d.id, d.name, d.type, d.size, d.hash, d.security_level, d.created_at,
+             COUNT(DISTINCT v.id) as verification_count
+      FROM documents d
+      LEFT JOIN verifications v ON d.id = v.document_id
+      WHERE d.created_by = ?
+         OR d.id IN (SELECT document_id FROM permissions WHERE user_id = ? AND (expires_at IS NULL OR expires_at > ?))
+      GROUP BY d.id
+      ORDER BY d.created_at DESC
+    `).bind(user.id, user.id, now).all();
+    const rows = results.results;
+    const lines = ["ID,Nombre,Tipo,Tama\xF1o (bytes),Hash SHA-3,Nivel de Seguridad,Verificaciones,Fecha de Creaci\xF3n"];
+    for (const r of rows) {
+      lines.push([r.id, r.name, r.type, r.size, r.hash || "", r.security_level, r.verification_count, r.created_at].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","));
+    }
+    return new Response(lines.join("\n"), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="documentos_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv"`
+      }
+    });
+  } catch (err) {
+    console.error("Export CSV error:", err);
+    return c.json({ success: false, error: "Error al exportar" }, 500);
+  }
+});
+documents.get("/stats/advanced", authMiddleware2.authenticate.bind(authMiddleware2), async (c) => {
+  try {
+    const user = c.get("user");
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1e3).toISOString();
+    const byType = await c.env.DB.prepare(`
+      SELECT type, COUNT(*) as count FROM documents
+      WHERE created_by = ? GROUP BY type ORDER BY count DESC LIMIT 10
+    `).bind(user.id).all();
+    const byLevel = await c.env.DB.prepare(`
+      SELECT security_level, COUNT(*) as count FROM documents
+      WHERE created_by = ? GROUP BY security_level
+    `).bind(user.id).all();
+    const byDay = await c.env.DB.prepare(`
+      SELECT DATE(created_at) as day, COUNT(*) as count FROM documents
+      WHERE created_by = ? AND created_at >= ?
+      GROUP BY DATE(created_at) ORDER BY day ASC
+    `).bind(user.id, thirtyDaysAgo).all();
+    const sizeRow = await c.env.DB.prepare(`
+      SELECT SUM(size) as total_size, COUNT(*) as total FROM documents WHERE created_by = ?
+    `).bind(user.id).first();
+    const verifByStatus = await c.env.DB.prepare(`
+      SELECT status, COUNT(*) as count FROM verifications GROUP BY status
+    `).all();
+    return c.json({ success: true, data: {
+      byType: byType.results.map((r) => ({ type: r.type, count: r.count })),
+      byLevel: byLevel.results.map((r) => ({ level: r.security_level, count: r.count })),
+      byDay: byDay.results.map((r) => ({ day: r.day, count: r.count })),
+      totalSize: sizeRow?.total_size || 0,
+      totalDocs: sizeRow?.total || 0,
+      verifByStatus: verifByStatus.results.map((r) => ({ status: r.status, count: r.count }))
+    } });
+  } catch (err) {
+    console.error("Advanced stats error:", err);
+    return c.json({ success: false, error: "Error al obtener estad\xEDsticas" }, 500);
   }
 });
 documents.post("/:id/permissions", authMiddleware2.authenticate.bind(authMiddleware2), async (c) => {
