@@ -507,8 +507,10 @@ async function renderVault(page = 1, search = '') {
             <td>
               <div style="display:flex;gap:6px">
                 <button class="btn btn-secondary btn-sm" onclick="viewDocModal('${d.id}','${d.name}')" title="Ver detalles"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-secondary btn-sm" onclick="previewDocModal('${d.id}','${d.name}','${d.type}')" title="Previsualizar"><i class="fas fa-search"></i></button>
                 <button class="btn btn-success btn-sm" onclick="verifyDocDirect('${d.id}')" title="Verificar autenticidad"><i class="fas fa-shield-alt"></i></button>
                 <button class="btn btn-secondary btn-sm" onclick="grantAccessModal('${d.id}','${d.name}')" title="Gestionar accesos"><i class="fas fa-key"></i></button>
+                <button class="btn btn-danger btn-sm" onclick="confirmDeleteDoc('${d.id}','${d.name}')" title="Eliminar documento"><i class="fas fa-trash"></i></button>
               </div>
             </td>
           </tr>`).join('')}
@@ -1406,6 +1408,8 @@ async function viewDocModal(docId, docName) {
       </div>` : ''}
     </div>
     <div class="modal-footer">
+      <button class="btn btn-danger" onclick="confirmDeleteDoc('${d.id}','${d.name}');closeModal('modal-doc')"><i class="fas fa-trash"></i> Eliminar</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-doc');previewDocModal('${d.id}','${d.name}','${d.type}')"><i class="fas fa-search"></i> Previsualizar</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-doc')">Cerrar</button>
       <button class="btn btn-success" onclick="closeModal('modal-doc');navigate('verify')"><i class="fas fa-microscope"></i> Verificar Autenticidad</button>
     </div>`);
@@ -1420,6 +1424,108 @@ async function verifyDocDirect(docId) {
       `Puntuación de confianza: ${d.confidenceScore}%`);
   } else {
     navigate('verify');
+  }
+}
+
+// ─── Confirmar y eliminar documento ───────────────────────────────
+function confirmDeleteDoc(docId, docName) {
+  showModal('modal-confirm-delete', `
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-exclamation-triangle" style="color:#ef4444"></i> Eliminar Documento</div>
+      <button class="modal-close" onclick="closeModal('modal-confirm-delete')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:12px">¿Estás seguro de que deseas eliminar el documento?</p>
+      <div class="hash-display" style="padding:12px 16px">
+        <div class="hash-row"><span class="hash-label">Nombre:</span><span class="hash-value fw-600">${docName}</span></div>
+        <div class="hash-row"><span class="hash-label">ID:</span><span class="hash-value text-mono text-xs">${docId}</span></div>
+      </div>
+      <p style="margin-top:12px;color:#ef4444;font-size:13px"><i class="fas fa-warning"></i> Esta acción es irreversible. Se eliminarán también los permisos y verificaciones asociadas.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-confirm-delete')">Cancelar</button>
+      <button class="btn btn-danger" onclick="deleteDocument('${docId}')"><i class="fas fa-trash"></i> Sí, Eliminar</button>
+    </div>`);
+}
+
+async function deleteDocument(docId) {
+  closeModal('modal-confirm-delete');
+  const res = await del(`/documents/${docId}`);
+  if (res.ok && res.data.success) {
+    toast('success', 'Documento eliminado', 'El documento ha sido eliminado correctamente.');
+    renderVault();
+  } else {
+    toast('error', 'Error', res.data?.error || 'No se pudo eliminar el documento.');
+  }
+}
+
+// ─── Previsualizar documento ───────────────────────────────────────
+async function previewDocModal(docId, docName, docType) {
+  showModal('modal-preview', `
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-search"></i> ${docName}</div>
+      <button class="modal-close" onclick="closeModal('modal-preview')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="preview-body" style="min-height:200px;display:flex;align-items:center;justify-content:center">
+      <div class="loading-dots"><div></div><div></div><div></div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-preview')">Cerrar</button>
+      <button class="btn btn-primary" onclick="downloadDoc('${docId}','${docName}')"><i class="fas fa-download"></i> Descargar</button>
+    </div>`);
+
+  const res = await get(`/documents/${docId}/preview`);
+  const body = document.getElementById('preview-body');
+  if (!body) return;
+
+  if (!res.ok || !res.data.success) {
+    body.innerHTML = `<div style="text-align:center;color:#ef4444"><i class="fas fa-times-circle" style="font-size:2rem;margin-bottom:8px"></i><br>Error al cargar previsualización</div>`;
+    return;
+  }
+
+  const d = res.data.data;
+
+  if (!d.previewAvailable) {
+    body.innerHTML = `
+      <div style="text-align:center;padding:24px">
+        <div style="font-size:3rem;margin-bottom:12px">${fileIcon(docType)}</div>
+        <div class="fw-600" style="margin-bottom:4px">${d.name}</div>
+        <div class="text-secondary text-sm">${d.message || 'Vista previa no disponible para este tipo de archivo'}</div>
+        <div style="margin-top:16px">
+          <button class="btn btn-primary btn-sm" onclick="downloadDoc('${docId}','${docName}')"><i class="fas fa-download"></i> Descargar para ver</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (d.previewType === 'image') {
+    body.innerHTML = `<img src="${d.dataUrl}" style="max-width:100%;max-height:60vh;border-radius:8px;object-fit:contain" alt="${d.name}">`;
+    return;
+  }
+
+  if (d.previewType === 'pdf') {
+    body.style.padding = '0';
+    body.innerHTML = `<iframe src="${d.dataUrl}" style="width:100%;height:65vh;border:none;border-radius:0 0 8px 8px"></iframe>`;
+    return;
+  }
+}
+
+async function downloadDoc(docId, docName) {
+  try {
+    const res = await fetch(API + `/documents/${docId}/download`, {
+      headers: { 'Authorization': `Bearer ${State.token}` }
+    });
+    if (!res.ok) { toast('error','Error','No se pudo descargar el archivo.'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = docName;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('success','Descargando',`${docName} descargado correctamente.`);
+  } catch(e) {
+    toast('error','Error','Error al descargar el archivo.');
   }
 }
 
@@ -1817,6 +1923,10 @@ window.viewDoc         = (id) => navigate('vault');
 window.viewDocModal    = viewDocModal;
 window.verifyDocDirect = verifyDocDirect;
 window.grantAccessModal= grantAccessModal;
+window.confirmDeleteDoc= confirmDeleteDoc;
+window.deleteDocument  = deleteDocument;
+window.previewDocModal = previewDocModal;
+window.downloadDoc     = downloadDoc;
 window.doGrantAccess   = doGrantAccess;
 window.openGrantModal  = openGrantModal;
 window.setupMFA        = setupMFA;

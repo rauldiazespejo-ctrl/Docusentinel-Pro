@@ -277,6 +277,117 @@ documents.get('/:id/download', authMiddleware.authenticate.bind(authMiddleware),
   }
 });
 
+// ─── GET /:id/preview ──────────────────────────────────────────────
+documents.get('/:id/preview', authMiddleware.authenticate.bind(authMiddleware), async (c) => {
+  try {
+    const user = c.get('user');
+    const documentId = c.req.param('id');
+    const ip = getIP(c); const ua = getUA(c);
+    const now = new Date().toISOString();
+
+    const doc = await c.env.DB.prepare(`
+      SELECT * FROM documents
+      WHERE id = ? AND (
+        created_by = ?
+        OR id IN (SELECT document_id FROM permissions WHERE user_id = ? AND (expires_at IS NULL OR expires_at > ?))
+      )
+    `).bind(documentId, user.id, user.id, now).first();
+
+    if (!doc) return c.json({ success:false, error:'Documento no encontrado o sin permisos' }, 404);
+
+    // Obtener datos cifrados de R2
+    const r2Key = `documents/${documentId}`;
+    const r2Object = await c.env.R2.get(r2Key);
+
+    if (!r2Object) {
+      // Si no hay datos en R2 (modo dev), devolver info del doc
+      return c.json({ success: true, data: {
+        id: doc.id, name: doc.name, type: doc.type, size: doc.size,
+        previewAvailable: false, message: 'Vista previa no disponible en modo desarrollo'
+      }});
+    }
+
+    const ciphertext = await r2Object.arrayBuffer();
+    const iv     = (doc.encrypted_data as string);
+    const keyHex = (doc.encryption_key_id as string);
+    const plaintext = await encryptionService.decryptBuffer(ciphertext, keyHex, iv);
+
+    await auditService.logEvent(user.id,'DOCUMENT_VIEWED','document',documentId,
+      { name: doc.name },ip,ua,c.env.DB);
+
+    const docType = doc.type as string;
+
+    // Para imágenes: devolver base64
+    if (docType.startsWith('image/')) {
+      const base64 = Buffer.from(plaintext as ArrayBuffer).toString('base64');
+      return c.json({ success: true, data: {
+        id: doc.id, name: doc.name, type: docType,
+        previewAvailable: true,
+        previewType: 'image',
+        dataUrl: `data:${docType};base64,${base64}`
+      }});
+    }
+
+    // Para PDF: devolver base64
+    if (docType === 'application/pdf') {
+      const base64 = Buffer.from(plaintext as ArrayBuffer).toString('base64');
+      return c.json({ success: true, data: {
+        id: doc.id, name: doc.name, type: docType,
+        previewAvailable: true,
+        previewType: 'pdf',
+        dataUrl: `data:application/pdf;base64,${base64}`
+      }});
+    }
+
+    return c.json({ success: true, data: {
+      id: doc.id, name: doc.name, type: docType,
+      previewAvailable: false, message: 'Tipo de archivo sin vista previa'
+    }});
+
+  } catch (err) {
+    console.error('Preview error:', err);
+    return c.json({ success:false, error:'Error al previsualizar documento' }, 500);
+  }
+});
+
+// ─── DELETE /:id ───────────────────────────────────────────────────
+documents.delete('/:id', authMiddleware.authenticate.bind(authMiddleware), async (c) => {
+  try {
+    const user = c.get('user');
+    const documentId = c.req.param('id');
+    const ip = getIP(c); const ua = getUA(c);
+
+    // Verificar que el usuario es el dueño o admin (role <= 2)
+    const doc = await c.env.DB.prepare(`
+      SELECT * FROM documents WHERE id = ? AND (created_by = ? OR ? <= 2)
+    `).bind(documentId, user.id, user.role).first();
+
+    if (!doc) return c.json({ success:false, error:'Documento no encontrado o sin permisos para eliminar' }, 404);
+
+    // Eliminar de R2
+    try {
+      await c.env.R2.delete(`documents/${documentId}`);
+    } catch (r2Err) {
+      console.warn('R2 delete warning:', r2Err);
+    }
+
+    // Eliminar permisos relacionados
+    await c.env.DB.prepare(`DELETE FROM permissions WHERE document_id = ?`).bind(documentId).run();
+    // Eliminar verificaciones relacionadas
+    await c.env.DB.prepare(`DELETE FROM verifications WHERE document_id = ?`).bind(documentId).run();
+    // Eliminar el documento
+    await c.env.DB.prepare(`DELETE FROM documents WHERE id = ?`).bind(documentId).run();
+
+    await auditService.logEvent(user.id,'DOCUMENT_DELETED','document',documentId,
+      { name: doc.name, type: doc.type, size: doc.size },ip,ua,c.env.DB);
+
+    return c.json({ success:true, message:'Documento eliminado correctamente' });
+  } catch (err) {
+    console.error('Delete doc error:', err);
+    return c.json({ success:false, error:'Error al eliminar documento' }, 500);
+  }
+});
+
 // ─── POST /:id/permissions ─────────────────────────────────────────
 documents.post('/:id/permissions', authMiddleware.authenticate.bind(authMiddleware), async (c) => {
   try {
