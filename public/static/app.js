@@ -1154,11 +1154,11 @@ async function renderAudit(page = 1) {
             </td>
             <td>
               <div class="text-sm fw-600">${l.actor_email||l.actorEmail||'sistema'}</div>
-              <div class="text-xs text-muted">${(l.actor_role||l.actorRole||'').replace('_',' ')}</div>
+              <div class="text-xs text-muted">${String(l.actor_role||l.actorRole||'').replace(/_/g,' ')}</div>
             </td>
             <td>
               <div class="text-sm">${l.resource_type||l.resourceType||'—'}</div>
-              <div class="text-mono text-xs text-muted">${(l.resource_id||l.resourceId||'').substring(0,14)}</div>
+              <div class="text-mono text-xs text-muted">${String(l.resource_id||l.resourceId||'').substring(0,14)}</div>
             </td>
             <td class="text-mono text-xs">${l.actor_ip||l.actorIp||'—'}</td>
             <td>

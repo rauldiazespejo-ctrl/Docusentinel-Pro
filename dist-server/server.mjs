@@ -9287,7 +9287,11 @@ audit.get(
           action: l.action,
           actor_email: l.actorEmail || l.userId || "sistema",
           actor_name: l.actorName || l.userId || "Sistema",
-          actor_role: l.actorRole || "",
+          actor_role: (() => {
+            const roleMap = { 1: "Administrador", 2: "Editor", 3: "Viewer", 4: "Auditor" };
+            const r = l.actorRole;
+            return typeof r === "number" ? roleMap[r] || `Rol ${r}` : String(r || "");
+          })(),
           actor_ip: l.ipAddress || "\u2014",
           resource_type: l.resourceType || "\u2014",
           resource_id: l.resourceId || "\u2014",
@@ -9869,6 +9873,20 @@ app.route("/api/auth", auth_default);
 app.route("/api/documents", documents_default);
 app.route("/api/verification", verification_default);
 app.route("/api/audit", audit_default);
+app.get("/download/apk", (c) => {
+  const apkPath = join2(PUBLIC_DIR, "DocuSentinel-PRO-v1.1.0.apk");
+  if (!existsSync3(apkPath)) {
+    return c.json({ error: "APK no disponible" }, 404);
+  }
+  const apkBuffer = readFileSync(apkPath);
+  return new Response(apkBuffer, {
+    headers: {
+      "Content-Type": "application/vnd.android.package-archive",
+      "Content-Disposition": 'attachment; filename="DocuSentinel-PRO-v1.1.0.apk"',
+      "Content-Length": apkBuffer.length.toString()
+    }
+  });
+});
 app.get("/health", (c) => {
   return c.json({
     success: true,

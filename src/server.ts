@@ -100,6 +100,22 @@ app.route('/api/documents', documentRoutes)
 app.route('/api/verification', verificationRoutes)
 app.route('/api/audit', auditRoutes)
 
+// Descarga directa del APK
+app.get('/download/apk', (c) => {
+  const apkPath = join(PUBLIC_DIR, 'DocuSentinel-PRO-v1.1.0.apk')
+  if (!existsSync(apkPath)) {
+    return c.json({ error: 'APK no disponible' }, 404)
+  }
+  const apkBuffer = readFileSync(apkPath)
+  return new Response(apkBuffer, {
+    headers: {
+      'Content-Type': 'application/vnd.android.package-archive',
+      'Content-Disposition': 'attachment; filename="DocuSentinel-PRO-v1.1.0.apk"',
+      'Content-Length': apkBuffer.length.toString()
+    }
+  })
+})
+
 // Health check
 app.get('/health', (c) => {
   return c.json({
