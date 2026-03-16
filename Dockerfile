@@ -1,15 +1,18 @@
-# ─── Build stage ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+# ─── DocuSentinel PRO - Dockerfile para Render.com ──────────────────────────
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Copiar archivos de dependencias
+# Instalar dependencias del sistema para better-sqlite3
+RUN apk add --no-cache python3 make g++ sqlite
+
+# Copiar package.json
 COPY package*.json ./
 
-# Instalar TODAS las dependencias (incluyendo devDependencies para el build)
+# Instalar todas las dependencias (necesarias para compilar better-sqlite3)
 RUN npm ci
 
-# Copiar código fuente
+# Copiar código fuente completo
 COPY src/ ./src/
 COPY migrations/ ./migrations/
 COPY public/ ./public/
@@ -17,24 +20,10 @@ COPY build-server.mjs ./
 COPY tsconfig*.json ./
 COPY vite.config.ts ./
 
-# Compilar el servidor
+# Compilar el servidor Node.js
 RUN node build-server.mjs
 
-# ─── Production stage ────────────────────────────────────────────────────────
-FROM node:20-alpine AS production
-
-WORKDIR /app
-
-# Instalar solo dependencias de producción
-COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-
-# Copiar archivos compilados y estáticos
-COPY --from=builder /app/dist-server/server.mjs ./dist-server/server.mjs
-COPY --from=builder /app/migrations ./migrations
-COPY --from=builder /app/public ./public
-
-# Crear directorio de datos
+# Crear directorio de datos persistentes
 RUN mkdir -p /data
 
 # Variables de entorno por defecto
@@ -46,11 +35,6 @@ ENV PUBLIC_DIR=/app/public
 
 # Exponer puerto
 EXPOSE 3000
-
-# Usuario no-root para seguridad
-RUN addgroup -g 1001 -S nodejs && adduser -S docusentinel -u 1001
-RUN chown -R docusentinel:nodejs /data
-USER docusentinel
 
 # Comando de inicio
 CMD ["node", "dist-server/server.mjs"]
